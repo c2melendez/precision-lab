@@ -43,6 +43,16 @@ class OperationType(str, Enum):
     # que ya traía la spec v9 original.
     MATRIX_REF = "matrix_ref"
     MATRIX_RREF = "matrix_rref"
+    # P5 (spec v2 §6): dot/cross usan MATRIX_OPERATION (van por
+    # /matrix/operations, igual que kronecker). norm es de una sola
+    # matriz, necesita su propio valor de operación (igual que
+    # transpose/power).
+    MATRIX_NORM = "matrix_norm"
+    # P6 (spec v2 §7)
+    STATISTICS_DESCRIPTIVE = "statistics_descriptive"
+    STATISTICS_COMBINATORICS = "statistics_combinatorics"
+    STATISTICS_BINOMIAL = "statistics_binomial"
+    STATISTICS_NORMAL = "statistics_normal"
 
 
 class MatrixOpKind(str, Enum):
@@ -52,6 +62,13 @@ class MatrixOpKind(str, Enum):
     # Fase C: producto de Kronecker, va en /matrix/operations junto con
     # add/subtract/multiply porque también necesita dos matrices.
     KRONECKER = "kronecker"
+    # P5 (spec v2 §6): dot/cross también necesitan dos matrices (vectores,
+    # en realidad — 1xn o nx1), van en /matrix/operations por el mismo
+    # motivo que KRONECKER. `norm` NO va aquí: es de una sola matriz,
+    # sigue el patrón de transpose/determinant (su propio endpoint
+    # dedicado /matrix/norm, ver routers/matrices.py).
+    DOT = "dot"
+    CROSS = "cross"
 
 
 class ResultType(str, Enum):

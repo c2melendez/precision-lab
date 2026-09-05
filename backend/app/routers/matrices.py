@@ -57,6 +57,27 @@ async def matrix_operations(payload: MatrixOperationRequest, request: Request) -
             result = matrix_service.add_or_subtract(matrix_a, matrix_b, payload.operation)
         elif payload.operation == MatrixOpKind.KRONECKER:
             result = matrix_service.kronecker(matrix_a, matrix_b)
+        elif payload.operation == MatrixOpKind.CROSS:
+            result = matrix_service.cross(matrix_a, matrix_b)
+        elif payload.operation == MatrixOpKind.DOT:
+            # P5 (spec v2 §6): dot devuelve un escalar (ScalarStepResult),
+            # no una matriz — se arma la respuesta aparte, no puede pasar
+            # por el "return MathResponse(...)" genérico de abajo (que
+            # asume result.result_matrix).
+            dot_result = matrix_service.dot(matrix_a, matrix_b)
+            return MathResponse(
+                success=True,
+                operation=OperationType.MATRIX_OPERATION,
+                request_id=request.state.request_id,
+                result_type=ResultType.SCALAR,
+                result_text=str(dot_result.value),
+                result_latex=sympy.latex(dot_result.value),
+                result_approx=float(dot_result.value) if dot_result.value.is_real else None,
+                steps=dot_result.steps,
+                has_detailed_steps=dot_result.has_detailed_steps,
+                warnings=dot_result.warnings,
+                duration_ms=_duration_ms(request),
+            )
         else:
             result = matrix_service.multiply(matrix_a, matrix_b)
     except matrix_service.DimensionMismatchError as exc:
@@ -249,6 +270,39 @@ async def matrix_power(payload: MatrixPowerRequest, request: Request) -> MathRes
         request_id=request.state.request_id,
         result_type=ResultType.MATRIX,
         result_data=matrix_service.matrix_to_result_data(result.result_matrix),
+        steps=result.steps,
+        has_detailed_steps=result.has_detailed_steps,
+        warnings=result.warnings,
+        duration_ms=_duration_ms(request),
+    )
+
+
+@router.post("/matrix/norm", response_model=MathResponse)
+async def matrix_norm(payload: MatrixSingleRequest, request: Request) -> MathResponse:
+    """P5 (spec v2 §6) — mismo patrón que /matrix/determinant: escalar,
+    no matriz, con result_approx además de la forma exacta."""
+    log_request_event(request.state.request_id, "matrix_norm_request")
+
+    try:
+        matrix = matrix_service.parse_matrix(payload.matrix)
+    except parsing.ParseSecurityError as exc:
+        return _error(request, OperationType.MATRIX_NORM, ErrorCode.PARSE_ERROR, str(exc))
+    except ComplexityLimitError as exc:
+        return _error(request, OperationType.MATRIX_NORM, ErrorCode.COMPLEXITY_LIMIT, str(exc))
+
+    try:
+        result = matrix_service.norm(matrix)
+    except matrix_service.DimensionMismatchError as exc:
+        return _error(request, OperationType.MATRIX_NORM, ErrorCode.DIMENSION_MISMATCH, str(exc))
+
+    return MathResponse(
+        success=True,
+        operation=OperationType.MATRIX_NORM,
+        request_id=request.state.request_id,
+        result_type=ResultType.SCALAR,
+        result_text=str(result.value),
+        result_latex=sympy.latex(result.value),
+        result_approx=float(result.value) if result.value.is_real else None,
         steps=result.steps,
         has_detailed_steps=result.has_detailed_steps,
         warnings=result.warnings,

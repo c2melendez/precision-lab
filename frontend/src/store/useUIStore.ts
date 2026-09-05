@@ -6,7 +6,7 @@
 
 import { create } from "zustand";
 
-export type CalculatorMode = "basic" | "simple" | "derivative" | "integral" | "equation" | "system" | "matrix" | "graph" | "limit";
+export type CalculatorMode = "basic" | "simple" | "derivative" | "integral" | "equation" | "system" | "matrix" | "graph" | "limit" | "statistics" | "units";
 export type Theme = "dark" | "light";
 
 interface UIState {

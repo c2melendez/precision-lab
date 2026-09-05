@@ -115,3 +115,34 @@ class Mad(Function):
         n = len(args)
         m = sympy.Add(*args) / n
         return sympy.Add(*[sympy.Abs(a - m) for a in args]) / n
+
+
+# P6 (spec v2 §7.1): Variance/Stdev de arriba son muestrales (n-1) —
+# faltaba la variante poblacional. Se agregan como clases NUEVAS, sin
+# tocar Variance/Stdev (que ya usa el campo de expresión libre) ni su
+# firma.
+def _variance_population(args) -> sympy.Expr:
+    n = len(args)
+    m = sympy.Add(*args) / n
+    sum_sq = sympy.Add(*[(a - m) ** 2 for a in args])
+    return sum_sq / n
+
+
+class VariancePop(Function):
+    @classmethod
+    def eval(cls, *args):
+        if not _all_numeric(args):
+            return None
+        if len(args) < 1:
+            raise ValueError("variancepop necesita al menos 1 valor.")
+        return _variance_population(args)
+
+
+class StdevPop(Function):
+    @classmethod
+    def eval(cls, *args):
+        if not _all_numeric(args):
+            return None
+        if len(args) < 1:
+            raise ValueError("stdevpop necesita al menos 1 valor.")
+        return sympy.sqrt(_variance_population(args))

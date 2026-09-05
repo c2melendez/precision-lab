@@ -22,7 +22,10 @@ type Operation =
   | "power"
   | "eigen"
   | "ref"
-  | "rref";
+  | "rref"
+  | "dot"
+  | "cross"
+  | "norm";
 
 const OPERATION_LABELS: Record<Operation, string> = {
   add: "Suma (A + B)",
@@ -36,9 +39,13 @@ const OPERATION_LABELS: Record<Operation, string> = {
   eigen: "Eigenvalores y eigenvectores",
   ref: "Forma escalonada (ref)",
   rref: "Forma escalonada reducida (rref)",
+  // P5 (spec v2 §6): A y B son vectores (matriz 1xn o nx1) en estas 3.
+  dot: "Producto punto (A · B)",
+  cross: "Producto cruz (A ⨯ B)",
+  norm: "Norma / magnitud (‖A‖)",
 };
 
-const NEEDS_MATRIX_B: ReadonlySet<Operation> = new Set(["add", "subtract", "multiply", "kronecker"]);
+const NEEDS_MATRIX_B: ReadonlySet<Operation> = new Set(["add", "subtract", "multiply", "kronecker", "dot", "cross"]);
 const NEEDS_EXPONENT: ReadonlySet<Operation> = new Set(["power"]);
 
 function emptyMatrix(rows: number, cols: number): string[][] {
@@ -177,7 +184,14 @@ export function MatrixMode() {
       let result: MathResponse;
       const label = `Matriz A ${rowsA}x${colsA} — ${OPERATION_LABELS[operation]}`;
 
-      if (operation === "add" || operation === "subtract" || operation === "multiply" || operation === "kronecker") {
+      if (
+        operation === "add" ||
+        operation === "subtract" ||
+        operation === "multiply" ||
+        operation === "kronecker" ||
+        operation === "dot" ||
+        operation === "cross"
+      ) {
         result = await submitAndRecord(
           "/matrix/operations",
           { operation, matrix_a: matrixA, matrix_b: matrixB },
@@ -193,6 +207,8 @@ export function MatrixMode() {
         result = await submitAndRecord("/matrix/ref", { matrix: matrixA }, label);
       } else if (operation === "rref") {
         result = await submitAndRecord("/matrix/rref", { matrix: matrixA }, label);
+      } else if (operation === "norm") {
+        result = await submitAndRecord("/matrix/norm", { matrix: matrixA }, label);
       } else if (operation === "power") {
         result = await submitAndRecord(
           "/matrix/power",

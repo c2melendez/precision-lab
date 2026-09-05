@@ -28,9 +28,11 @@ from sympy import (
     Pow,
     Symbol,
     acos,
+    arg,
     asin,
     atan,
     binomial,
+    conjugate,
     cos,
     cosh,
     cot,
@@ -57,7 +59,7 @@ from sympy.parsing.sympy_parser import (
     standard_transformations,
 )
 
-from app.services.stat_functions import Mad, Mean, Median, Mode, Range, Stdev, Variance
+from app.services.stat_functions import Mad, Mean, Median, Mode, Range, Stdev, StdevPop, Variance, VariancePop
 
 MAX_EXPRESSION_LENGTH = 500
 MIN_EXPRESSION_LENGTH = 1
@@ -117,12 +119,43 @@ ALLOWED_FUNCTIONS = {
     "stdev": Stdev,
     "variance": Variance,
     "var": Variance,  # alias real: la tecla del teclado inserta \mathrm{var}
+    # P6 (spec v2 §7.1): variantes poblacionales, funciones nuevas.
+    "stdevpop": StdevPop,
+    "variancepop": VariancePop,
     "mad": Mad,
     "mod": Mod,
     "gcd": gcd,
     "lcm": lcm,
     "nCr": binomial,
     "nPr": FallingFactorial,
+    # P4 (spec v2 §5.2, Complejos): re/im/arg/conjugate son nativos de
+    # SymPy — solo hacía falta registrarlos, mismo patrón que arriba.
+    # "re"/"im" se referencian como sympy.re/sympy.im (no importados como
+    # nombres sueltos: colisionarían con el módulo `re` de Python, ya
+    # importado arriba para regex) en vez de "conjugate" tal cual, la
+    # tecla del teclado usa la etiqueta corta "conj" (mismo criterio que
+    # "var" para \mathrm{var} en vez de \mathrm{variance}).
+    "re": sympy.re,
+    "im": sympy.im,
+    "arg": arg,
+    "conj": conjugate,
+    # "⇄ Polar": NO es una función nativa de SymPy de un solo símbolo (la
+    # spec lo dice explícito, §5.2) — se compone aquí con Abs/exp/arg, los
+    # 3 ya registrados arriba. Importante: como valor de ALLOWED_FUNCTIONS
+    # es una función Python (lambda), no una clase, así que
+    # `isinstance(cls, type)` en ast_validator.py la EXCLUYE del set de
+    # "clases permitidas" que usa la etapa 8 — pero eso no es un problema
+    # de seguridad: parse_expr() la invoca y sustituye su resultado
+    # (Abs(z)*exp(I*arg(z))) DURANTE el parseo, así que el árbol final que
+    # ve validate_ast_safety solo contiene nodos Abs/exp/arg/Mul, todos ya
+    # permitidos — "topolar" en sí nunca sobrevive como nodo Function en
+    # el árbol. No pude ejecutar el pipeline real de parse_expr en este
+    # entorno para confirmarlo empíricamente (sin red/dependencias
+    # instaladas) — recomiendo un test explícito
+    # (test_parsing.py/test_ast_validator.py) antes de dar este parche por
+    # cerrado en Python. Dirección única (rectangular -> polar); no existe
+    # sintaxis de entrada polar en este teclado para la dirección inversa.
+    "topolar": lambda z: Abs(z) * exp(I * arg(z)),
 }
 ALLOWED_CONSTANTS = {"pi": pi, "e": E, "E": E, "i": I, "I": I, "oo": oo}
 

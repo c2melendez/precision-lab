@@ -157,6 +157,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matrix/ref": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Matrix Ref
+         * @description Fase C (spec UX estilo ClassCalc, sección 4).
+         */
+        post: operations["matrix_ref_api_v1_matrix_ref_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matrix/rref": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Matrix Rref
+         * @description Fase C (spec UX estilo ClassCalc, sección 4).
+         */
+        post: operations["matrix_rref_api_v1_matrix_rref_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/matrix/determinant": {
         parameters: {
             query?: never;
@@ -219,6 +259,27 @@ export interface paths {
         put?: never;
         /** Matrix Power */
         post: operations["matrix_power_api_v1_matrix_power_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matrix/norm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Matrix Norm
+         * @description P5 (spec v2 §6) — mismo patrón que /matrix/determinant: escalar,
+         *     no matriz, con result_approx además de la forma exacta.
+         */
+        post: operations["matrix_norm_api_v1_matrix_norm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -420,10 +481,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/statistics/descriptive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Statistics Descriptive */
+        post: operations["statistics_descriptive_api_v1_statistics_descriptive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/statistics/combinatorics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Statistics Combinatorics */
+        post: operations["statistics_combinatorics_api_v1_statistics_combinatorics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/statistics/binomial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Statistics Binomial */
+        post: operations["statistics_binomial_api_v1_statistics_binomial_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/statistics/normal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Statistics Normal */
+        post: operations["statistics_normal_api_v1_statistics_normal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BinomialRequest */
+        BinomialRequest: {
+            /** N */
+            n: number;
+            /** P */
+            p: number;
+            /**
+             * K
+             * @default 0
+             */
+            k: number;
+            /**
+             * Query
+             * @enum {string}
+             */
+            query: "pmf" | "cdf" | "survival" | "mean" | "variance";
+        };
+        /** CombinatoricsRequest */
+        CombinatoricsRequest: {
+            /** N */
+            n: number;
+            /**
+             * R
+             * @default 0
+             */
+            r: number;
+            /**
+             * Fn
+             * @enum {string}
+             */
+            fn: "nCr" | "nPr" | "factorial";
+        };
         /** DerivativeRequest */
         DerivativeRequest: {
             /** Expression */
@@ -726,7 +887,7 @@ export interface components {
          * MatrixOpKind
          * @enum {string}
          */
-        MatrixOpKind: "add" | "subtract" | "multiply";
+        MatrixOpKind: "add" | "subtract" | "multiply" | "kronecker" | "dot" | "cross";
         /** MatrixOperationRequest */
         MatrixOperationRequest: {
             operation: components["schemas"]["MatrixOpKind"];
@@ -747,11 +908,44 @@ export interface components {
             /** Matrix */
             matrix: string[][];
         };
+        /** NormalRequest */
+        NormalRequest: {
+            /**
+             * Mu
+             * @default 0
+             */
+            mu: number;
+            /**
+             * Sigma
+             * @default 1
+             */
+            sigma: number;
+            /**
+             * X
+             * @default 0
+             */
+            x: number;
+            /**
+             * A
+             * @default 0
+             */
+            a: number;
+            /**
+             * B
+             * @default 0
+             */
+            b: number;
+            /**
+             * Query
+             * @enum {string}
+             */
+            query: "cdf" | "range" | "zscore";
+        };
         /**
          * OperationType
          * @enum {string}
          */
-        OperationType: "evaluate" | "simplify" | "factor" | "expand" | "solve" | "derivative" | "integral" | "matrix_operation" | "matrix_determinant" | "matrix_inverse" | "graph_2d" | "solve_system" | "inequality" | "limit" | "series" | "matrix_eigen" | "integral_improper" | "graph_3d" | "graph_parametric" | "derivative_partial" | "derivative_implicit" | "matrix_transpose" | "matrix_power" | "matrix_ref" | "matrix_rref";
+        OperationType: "evaluate" | "simplify" | "factor" | "expand" | "solve" | "derivative" | "integral" | "matrix_operation" | "matrix_determinant" | "matrix_inverse" | "graph_2d" | "solve_system" | "inequality" | "limit" | "series" | "matrix_eigen" | "integral_improper" | "graph_3d" | "graph_parametric" | "derivative_partial" | "derivative_implicit" | "matrix_transpose" | "matrix_power" | "matrix_ref" | "matrix_rref" | "matrix_norm" | "statistics_descriptive" | "statistics_combinatorics" | "statistics_binomial" | "statistics_normal";
         /** PartialDerivativeRequest */
         PartialDerivativeRequest: {
             /** Expression */
@@ -808,6 +1002,22 @@ export interface components {
             equations: string[];
             /** Variables */
             variables: string[];
+        };
+        /** StatisticsDescriptiveRequest */
+        StatisticsDescriptiveRequest: {
+            /** Values */
+            values: number[];
+            /**
+             * Stat
+             * @enum {string}
+             */
+            stat: "mean" | "median" | "mode" | "sum" | "sumsq" | "n" | "min" | "max" | "range" | "mad" | "variance" | "stdev";
+            /**
+             * Variance Kind
+             * @default population
+             * @enum {string}
+             */
+            variance_kind: "population" | "sample";
         };
         /** Step */
         Step: {
@@ -1145,6 +1355,72 @@ export interface operations {
             };
         };
     };
+    matrix_ref_api_v1_matrix_ref_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixSingleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    matrix_rref_api_v1_matrix_rref_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixSingleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     matrix_determinant_api_v1_matrix_determinant_post: {
         parameters: {
             query?: never;
@@ -1254,6 +1530,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MatrixPowerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    matrix_norm_api_v1_matrix_norm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixSingleRequest"];
             };
         };
         responses: {
@@ -1617,6 +1926,138 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ImplicitDerivativeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statistics_descriptive_api_v1_statistics_descriptive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatisticsDescriptiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statistics_combinatorics_api_v1_statistics_combinatorics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CombinatoricsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statistics_binomial_api_v1_statistics_binomial_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BinomialRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statistics_normal_api_v1_statistics_normal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NormalRequest"];
             };
         };
         responses: {

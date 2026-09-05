@@ -21,7 +21,7 @@ from app.core.exception_handlers import (
     validation_exception_handler,
 )
 from app.core.logging import configure_logging
-from app.routers import algebra, calculus, evaluate, graphing, health, matrices, phase2
+from app.routers import algebra, calculus, evaluate, graphing, health, matrices, phase2, statistics
 
 configure_logging()
 
@@ -77,3 +77,4 @@ app.include_router(calculus.router, prefix=API_V1_PREFIX)
 app.include_router(matrices.router, prefix=API_V1_PREFIX)
 app.include_router(graphing.router, prefix=API_V1_PREFIX)
 app.include_router(phase2.router, prefix=API_V1_PREFIX)
+app.include_router(statistics.router, prefix=API_V1_PREFIX)

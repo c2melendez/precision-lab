@@ -154,3 +154,37 @@ class ImplicitDerivativeRequest(BaseModel):
     equation: str = Field(..., min_length=1, max_length=500)  # debe contener "="
     dependent_variable: str = "y"
     independent_variable: str = "x"
+
+
+# ---------------------------------------------------------------------------
+# P6 (spec v2 §7.4): Estadística — StatisticsDescriptiveRequest,
+# CombinatoricsRequest, BinomialRequest, NormalRequest.
+# ---------------------------------------------------------------------------
+
+
+class StatisticsDescriptiveRequest(BaseModel):
+    values: List[float] = Field(..., min_length=1, max_length=200)
+    stat: Literal["mean", "median", "mode", "sum", "sumsq", "n", "min", "max", "range", "mad", "variance", "stdev"]
+    variance_kind: Literal["population", "sample"] = "population"
+
+
+class CombinatoricsRequest(BaseModel):
+    n: int = Field(..., ge=0, le=170)  # 170! es el límite antes de overflow en float
+    r: int = Field(0, ge=0, le=170)
+    fn: Literal["nCr", "nPr", "factorial"]
+
+
+class BinomialRequest(BaseModel):
+    n: int = Field(..., ge=0, le=1000)
+    p: float = Field(..., ge=0, le=1)
+    k: int = Field(0, ge=0)
+    query: Literal["pmf", "cdf", "survival", "mean", "variance"]
+
+
+class NormalRequest(BaseModel):
+    mu: float = 0
+    sigma: float = Field(1, gt=0)
+    x: float = 0
+    a: float = 0
+    b: float = 0
+    query: Literal["cdf", "range", "zscore"]

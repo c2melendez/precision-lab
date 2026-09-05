@@ -21,7 +21,9 @@ import { HistoryDrawer } from "./components/HistoryDrawer";
 import { IntegralMode } from "./components/IntegralMode";
 import { LimitMode } from "./components/LimitMode";
 import { MatrixMode } from "./components/MatrixMode";
+import { StatisticsMode } from "./components/StatisticsMode";
 import { SystemMode } from "./components/SystemMode";
+import { UnitsMode } from "./components/UnitsMode";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useUIStore, type CalculatorMode } from "./store/useUIStore";
 
@@ -35,6 +37,8 @@ const MODE_LABELS: Record<CalculatorMode, string> = {
   matrix: "Matrices",
   graph: "Gráficas",
   limit: "Límite",
+  statistics: "Estadística",
+  units: "Unidades",
 };
 
 // Punto 4 del rediseño de teclado (pedido de Carlos): Derivada/Integral/
@@ -47,7 +51,12 @@ const MODE_LABELS: Record<CalculatorMode, string> = {
 // Límite sigue el mismo criterio desde que se creó: el router también lo
 // detecta ahora (ver calculusIntent.ts), así que tampoco ocupa un lugar
 // en la navegación principal.
-const VISIBLE_MODES: CalculatorMode[] = ["basic", "simple", "matrix", "graph"];
+//
+// P6 (spec v2 §7): "statistics" nueva, visible.
+// P7 (spec v2 §8): "units" nueva, visible — con esto queda el orden
+// final de §9: Científica · Basic · Matrices · Gráficas · Estadística ·
+// Unidades.
+const VISIBLE_MODES: CalculatorMode[] = ["basic", "simple", "matrix", "graph", "statistics", "units"];
 
 function ActiveModeForm({ mode }: { mode: CalculatorMode }) {
   switch (mode) {
@@ -67,6 +76,10 @@ function ActiveModeForm({ mode }: { mode: CalculatorMode }) {
       return <MatrixMode />;
     case "graph":
       return <GraphMode />;
+    case "statistics":
+      return <StatisticsMode />;
+    case "units":
+      return <UnitsMode />;
     case "limit":
       return <LimitMode />;
   }

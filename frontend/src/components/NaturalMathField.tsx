@@ -79,6 +79,16 @@ const KNOWN_MULTI_LETTER_FUNCTION_NAMES = [
   "nCr",
   "nPr",
   "var",
+  // P4 (spec v2 §5, Complejos) — mismo bug, mismo fix: sin esto "re(2+3i)"
+  // llegaría al backend como "r e ( 2 + 3 i )" (variables sueltas).
+  "re",
+  "im",
+  "arg",
+  "conj",
+  "topolar",
+  // P6 (spec v2 §7.1): variantes poblacionales — mismo motivo.
+  "stdevpop",
+  "variancepop",
 ];
 
 function collapseKnownFunctionNames(ascii: string): string {

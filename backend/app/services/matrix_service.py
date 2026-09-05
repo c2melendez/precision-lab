@@ -729,3 +729,98 @@ def kronecker(matrix_a: sympy.Matrix, matrix_b: sympy.Matrix) -> MatrixOperation
         latex_after=sympy.latex(result_matrix),
     )
     return MatrixOperationResult(result_matrix, [step], True, [])
+
+
+# ---------------------------------------------------------------------------
+# P5 (spec v2 §6): Vectores en Matrices — dot/cross/norm. Un vector es una
+# matriz 1xn o nx1 (spec explícita: no se crea componente de entrada
+# nuevo). A diferencia del equivalente en precision-lab-lite (que usa
+# Fraction.js y por eso `norm` requiere una excepción documentada a su
+# regla de aritmética exacta), aquí `sympy.sqrt(...)` representa la raíz
+# de forma simbólica exacta sin ningún caso especial — mismo patrón que
+# ya usa `determinant` para exponer el valor exacto (`result_text`/
+# `result_latex`) junto con su aproximación decimal (`result_approx`).
+# ---------------------------------------------------------------------------
+
+
+def _as_vector(matrix: sympy.Matrix) -> List[sympy.Expr]:
+    if matrix.rows == 1:
+        return list(matrix.row(0))
+    if matrix.cols == 1:
+        return list(matrix.col(0))
+    raise DimensionMismatchError(
+        f"Se esperaba un vector (1 fila o 1 columna); recibida una matriz de {matrix.shape}."
+    )
+
+
+def dot(matrix_a: sympy.Matrix, matrix_b: sympy.Matrix) -> ScalarStepResult:
+    va = _as_vector(matrix_a)
+    vb = _as_vector(matrix_b)
+    if len(va) != len(vb):
+        raise DimensionMismatchError(
+            f"Producto punto requiere vectores de la misma longitud: A tiene {len(va)}, "
+            f"B tiene {len(vb)}."
+        )
+    value = sympy.simplify(sum(a * b for a, b in zip(va, vb)))
+    step = Step(
+        index=0,
+        title="Producto punto",
+        description="Suma de los productos componente a componente.",
+        rule="DotProduct",
+        latex_before=" + ".join(f"({sympy.latex(a)})({sympy.latex(b)})" for a, b in zip(va, vb)),
+        latex_after=sympy.latex(value),
+    )
+    return ScalarStepResult(value, [step], True, [])
+
+
+def cross(matrix_a: sympy.Matrix, matrix_b: sympy.Matrix) -> MatrixOperationResult:
+    """Válido únicamente para vectores de 3 componentes (spec v2 §6) —
+    dimensión inválida reutiliza `DimensionMismatchError`/
+    `ErrorCode.DIMENSION_MISMATCH` ya existente, no se inventa un código
+    de error nuevo."""
+    va = _as_vector(matrix_a)
+    vb = _as_vector(matrix_b)
+    if len(va) != 3 or len(vb) != 3:
+        raise DimensionMismatchError(
+            f"Producto cruz requiere vectores de 3 componentes: A tiene {len(va)}, "
+            f"B tiene {len(vb)}."
+        )
+    a1, a2, a3 = va
+    b1, b2, b3 = vb
+    result_matrix = sympy.Matrix([[a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1]])
+    step = Step(
+        index=0,
+        title="Producto cruz",
+        description="Producto cruz A×B (solo definido en 3 dimensiones).",
+        rule="CrossProduct",
+        latex_before=f"{sympy.latex(matrix_a)} \\times {sympy.latex(matrix_b)}",
+        latex_after=sympy.latex(result_matrix),
+    )
+    return MatrixOperationResult(result_matrix, [step], True, [])
+
+
+def norm(matrix: sympy.Matrix) -> ScalarStepResult:
+    """Magnitud/norma euclidiana. No requiere matriz B (como transpose/
+    determinant/inverse)."""
+    v = _as_vector(matrix)
+    sum_squares = sympy.simplify(sum(x**2 for x in v))
+    value = sympy.sqrt(sum_squares)
+    steps = [
+        Step(
+            index=0,
+            title="Suma de cuadrados",
+            description="Suma de los cuadrados de cada componente.",
+            rule="VectorNormSumSquares",
+            latex_before=" + ".join(f"({sympy.latex(x)})^2" for x in v),
+            latex_after=sympy.latex(sum_squares),
+        ),
+        Step(
+            index=1,
+            title="Raíz cuadrada",
+            description="Norma = raíz cuadrada de la suma de cuadrados.",
+            rule="VectorNormSqrt",
+            latex_before=f"\\sqrt{{{sympy.latex(sum_squares)}}}",
+            latex_after=sympy.latex(value),
+        ),
+    ]
+    return ScalarStepResult(value, steps, True, [])

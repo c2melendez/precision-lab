@@ -55,6 +55,14 @@ const ENDPOINT_TO_OPERATION: Record<KnownEndpoint, OperationType | null> = {
   "/graph/parametric": "graph_parametric",
   "/derivative/partial": "derivative_partial",
   "/derivative/implicit": "derivative_implicit",
+  // P5 (spec v2 §6) — faltaba en el cierre original del Parche 5, mismo
+  // motivo que en endpoints.ts.
+  "/matrix/norm": "matrix_norm",
+  // P6 (spec v2 §7)
+  "/statistics/descriptive": "statistics_descriptive",
+  "/statistics/combinatorics": "statistics_combinatorics",
+  "/statistics/binomial": "statistics_binomial",
+  "/statistics/normal": "statistics_normal",
 };
 
 function generateLocalRequestId(): string {

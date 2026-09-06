@@ -17,7 +17,7 @@
 
 import "mathlive";
 import { convertLatexToAsciiMath } from "mathlive/ssr";
-import { useEffect, useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 import type { MathfieldElement, MathfieldElementAttributes } from "mathlive";
 
 declare global {
@@ -154,13 +154,26 @@ export function NaturalMathField({
     }
   }, [latex]);
 
+  // Fix (ver informe del bug de Gráficas a Carlos): el `ref` de abajo NO
+  // puede ser una función inline — React reinvoca las callback refs cada
+  // vez que su identidad cambia, y una función inline es una identidad
+  // nueva en cada render. Cuando el `fieldRef` que pasa el padre también
+  // dispara un `setState` (como en Graph2DForm, que guarda un array de
+  // campos), eso generaba un bucle infinito de renders ("Maximum update
+  // depth exceeded", React error #185). `useCallback` la mantiene
+  // estable mientras `fieldRef` (la prop) no cambie de identidad.
+  const setRef = useCallback(
+    (el: MathfieldElement | null) => {
+      elRef.current = el;
+      fieldRef?.(el);
+    },
+    [fieldRef],
+  );
+
   return (
     <math-field
       id={fieldId}
-      ref={(el: MathfieldElement | null) => {
-        elRef.current = el;
-        fieldRef?.(el);
-      }}
+      ref={setRef}
       math-virtual-keyboard-policy="manual"
       aria-label={ariaLabel}
       placeholder={placeholder}

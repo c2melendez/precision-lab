@@ -125,6 +125,36 @@ function Graph2DForm() {
   const isLoading = useUIStore((state) => state.isLoading);
   const setActiveMode = useUIStore((state) => state.setActiveMode);
 
+  // Fix: bug real preexistente (ver informe a Carlos) — pasar
+  // `fieldRef={(el) => setMathFields(...)}` inline en el JSX de abajo
+  // crea una función nueva en cada render. React invoca las callback
+  // refs cada vez que cambia su identidad, y como `.map()` siempre
+  // devuelve un array nuevo, cada invocación disparaba un re-render →
+  // nueva función → se invoca de nuevo → bucle infinito ("Maximum
+  // update depth exceeded", React error #185), atrapado por el
+  // ErrorBoundary como "No se pudo mostrar el resultado." apenas se
+  // entra al modo Gráficas (submodo 2D, el que abre por defecto).
+  //
+  // Fix: una función estable por índice, cacheada en un ref (no en
+  // estado) para que su identidad no cambie entre renders, y que evite
+  // el setState si el elemento no cambió realmente.
+  const fieldRefCallbacks = useRef<Map<number, (el: MathfieldElement | null) => void>>(new Map());
+  function getFieldRef(index: number): (el: MathfieldElement | null) => void {
+    let cached = fieldRefCallbacks.current.get(index);
+    if (!cached) {
+      cached = (el: MathfieldElement | null) => {
+        setMathFields((current) => {
+          if (current[index] === el) return current;
+          const next = current.slice();
+          next[index] = el;
+          return next;
+        });
+      };
+      fieldRefCallbacks.current.set(index, cached);
+    }
+    return cached;
+  }
+
   function updateExpression(index: number, value: string): void {
     setLatexRows((current) => current.map((expr, i) => (i === index ? value : expr)));
   }
@@ -197,9 +227,7 @@ function Graph2DForm() {
                 onLatexChange={(value) => updateExpression(index, value)}
                 ariaLabel={`Expresión ${index + 1}`}
                 placeholder="x^2"
-                fieldRef={(el) =>
-                  setMathFields((current) => current.map((f, i) => (i === index ? el : f)))
-                }
+                fieldRef={getFieldRef(index)}
               />
             </div>
             {latexRows.length > 1 && (

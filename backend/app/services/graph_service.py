@@ -219,6 +219,18 @@ def _validate_variable(variable: str) -> sympy.Symbol:
     return sympy.Symbol(variable)
 
 
+# Fix (suite de regresión, caso G007: 1/(x-2) da 7.27e+134 en vez de null
+# justo en x=2). Al sustituir un float de Python en una expresión simbólica
+# y hacer `.evalf()`, el denominador de una asíntota exacta no siempre da
+# EXACTAMENTE 0 (representación interna de Float en SymPy) — así que
+# `1/épsilon_diminuto` da un número gigante pero finito, que el chequeo de
+# `zoo/oo/-oo/nan` no atrapa (esos son infinitos SIMBÓLICOS, no un float
+# enorme). Cualquier valor por encima de este umbral es, para efectos de
+# graficar, indistinguible de una asíntota real — se trata igual (`None`,
+# corta la línea) en vez de mostrar un número sin sentido.
+_ASYMPTOTE_MAGNITUDE_THRESHOLD = 1e10
+
+
 def _evaluate_at(expr: sympy.Expr, var_symbol: sympy.Symbol, x_value: float) -> Optional[float]:
     try:
         value = expr.subs(var_symbol, x_value).evalf()
@@ -233,6 +245,8 @@ def _evaluate_at(expr: sympy.Expr, var_symbol: sympy.Symbol, x_value: float) -> 
     except (TypeError, ValueError):
         return None
     if result != result:  # NaN
+        return None
+    if abs(result) > _ASYMPTOTE_MAGNITUDE_THRESHOLD:
         return None
     return result
 

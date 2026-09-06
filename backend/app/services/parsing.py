@@ -18,6 +18,7 @@ from sympy import (
     Abs,
     Add,
     E,
+    factorial,
     Float,
     I,
     Integer,
@@ -410,6 +411,17 @@ def build_minimal_global_dict() -> Dict[str, object]:
     Python"): si no se fija explícitamente, `eval()` inyecta los builtins
     reales de Python en cualquier diccionario de globals que no los
     contenga — este es exactamente el vector que la sección 7 pide cerrar.
+
+    Fix (suite de regresión, caso E030 "5!"): `standard_transformations`
+    incluye `factorial_notation` por defecto en SymPy, que reescribe `n!`
+    como una llamada a `factorial(n)` — pero como el token que el usuario
+    escribe es `!`, no la palabra "factorial", `classify_identifiers()`
+    nunca lo ve para registrarlo en `local_dict`. Sin `factorial` acá,
+    cualquier "!" tiraba `NameError: name 'factorial' is not defined`
+    pese a que un comentario más abajo decía que ya funcionaba. Es la
+    misma primitiva-de-transformación que Symbol/Integer/Add/Mul/Pow, así
+    que va en este diccionario mínimo, no en ALLOWED_FUNCTIONS (que es
+    para identificadores que SÍ aparecen como texto en la expresión).
     """
     return {
         "Symbol": Symbol,
@@ -418,6 +430,7 @@ def build_minimal_global_dict() -> Dict[str, object]:
         "Add": Add,
         "Mul": Mul,
         "Pow": Pow,
+        "factorial": factorial,
         "__builtins__": {},
     }
 

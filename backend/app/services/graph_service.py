@@ -5,6 +5,7 @@ app/services/graph_service.py — `/graph/2d` (spec, sección 10, `Graph2DReques
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
+import time
 from typing import List, Optional
 
 import sympy
@@ -38,6 +39,10 @@ _MAX_TOTAL_POINTS = 2500
 # nunca bloquea `domain` ni la graficación numérica en sí (spec sección 6,
 # mismo espíritu que el timeout de `step_verification`).
 _ANALYSIS_TIMEOUT_S = 1.5
+# Fix (R008/G104): presupuesto TOTAL para los 6 sub-cálculos de
+# compute_analysis juntos — ver comentario ahí. Sin esto, funciones
+# periódicas como tan(x) podían sumar hasta 6×1.5=9s.
+_TOTAL_ANALYSIS_BUDGET_S = 2.5
 _MAX_INTERCEPTS_REPORTED = 8
 
 
@@ -147,41 +152,71 @@ def compute_analysis(
     resultado que dependa de sustituir/evaluar (p. ej. "-1*4" en vez de
     "-4"). Se usa `sympy.expand()` para forzar la combinación antes de
     analizar — SOLO para este análisis, no afecta el resto del pipeline.
+
+    Fix (suite de regresión v1.1, caso R008/G104: graficar tan(x) tardaba
+    6-15 segundos). Cada uno de los 6 sub-cálculos de abajo tiene su
+    propio timeout independiente de 1.5s — pero para una función
+    periódica con infinitos puntos excluidos del dominio (como tan(x)),
+    VARIOS de esos sub-cálculos individualmente agotan su propio
+    timeout, y como no comparten presupuesto, se SUMAN: hasta 6×1.5=9s
+    en el peor caso, sin contar el overhead de crear 6 ThreadPoolExecutor
+    distintos. Se agrega un presupuesto de tiempo TOTAL compartido — una
+    vez agotado, el resto de los sub-cálculos se omite (mismo resultado
+    que si hubieran tronado individualmente: ese campo queda vacío, no
+    es un error) en vez de seguir gastando tiempo en análisis que ya no
+    alcanza a completarse dentro de un tiempo de respuesta razonable.
     """
     expr = sympy.expand(expr)
     analysis = GraphAnalysis()
+    deadline = time.monotonic() + _TOTAL_ANALYSIS_BUDGET_S
 
-    domain = _run_with_timeout(lambda: continuous_domain(expr, var_symbol, S.Reals))
+    def remaining() -> float:
+        return max(0.05, deadline - time.monotonic())
+
+    domain = None
+    if time.monotonic() < deadline:
+        domain = _run_with_timeout(lambda: continuous_domain(expr, var_symbol, S.Reals), timeout_s=remaining())
     if domain is not None:
         analysis.domain_text = str(domain)
         analysis.domain_latex = sympy.latex(domain)
 
-    range_result = _run_with_timeout(
-        lambda: function_range(expr, var_symbol, domain if domain is not None else S.Reals)
-    )
+    range_result = None
+    if time.monotonic() < deadline:
+        range_result = _run_with_timeout(
+            lambda: function_range(expr, var_symbol, domain if domain is not None else S.Reals),
+            timeout_s=remaining(),
+        )
     if range_result is not None:
         analysis.range_text = str(range_result)
         analysis.range_latex = sympy.latex(range_result)
 
-    y_intercept = _run_with_timeout(lambda: expr.subs(var_symbol, 0))
+    y_intercept = None
+    if time.monotonic() < deadline:
+        y_intercept = _run_with_timeout(lambda: expr.subs(var_symbol, 0), timeout_s=remaining())
     if y_intercept is not None:
         evaluated = y_intercept.evalf()
         if evaluated.is_real and evaluated.is_finite:
             analysis.y_intercept = str(y_intercept)
 
-    x_intercepts = _run_with_timeout(lambda: _format_real_roots(expr, var_symbol))
+    x_intercepts = None
+    if time.monotonic() < deadline:
+        x_intercepts = _run_with_timeout(lambda: _format_real_roots(expr, var_symbol), timeout_s=remaining())
     if x_intercepts is not None:
         analysis.x_intercepts = [str(root) for root in x_intercepts]
 
-    critical = _run_with_timeout(
-        lambda: _classify_critical_points(expr, var_symbol, x_min, x_max)
-    )
+    critical = None
+    if time.monotonic() < deadline:
+        critical = _run_with_timeout(
+            lambda: _classify_critical_points(expr, var_symbol, x_min, x_max), timeout_s=remaining()
+        )
     if critical is not None:
         maxima, minima = critical
         analysis.local_maxima = [str(p) for p in maxima]
         analysis.local_minima = [str(p) for p in minima]
 
-    inflection = _run_with_timeout(lambda: _inflection_points(expr, var_symbol, x_min, x_max))
+    inflection = None
+    if time.monotonic() < deadline:
+        inflection = _run_with_timeout(lambda: _inflection_points(expr, var_symbol, x_min, x_max), timeout_s=remaining())
     if inflection is not None:
         analysis.inflection_points = [str(p) for p in inflection]
 

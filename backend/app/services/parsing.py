@@ -88,10 +88,29 @@ ALLOWED_FUNCTIONS = {
     "asin": asin,
     "acos": acos,
     "atan": atan,
+    # Fix (suite de regresión v1.1, casos E136-E138): Lite reconoce tanto
+    # "asin" como "arcsin" (fix de la sesión de paridad de teclado), pero
+    # Python solo tenía "asin"/"acos"/"atan" — "arcsin(1)" quedaba sin
+    # reconocer como función (multiplicación implícita, resultado
+    # "arcsin*1" sin evaluar). Se agregan como alias del mismo sympy.asin/
+    # acos/atan para que ambas convenciones funcionen en los dos proyectos.
+    "arcsin": asin,
+    "arccos": acos,
+    "arctan": atan,
     "sinh": sinh,
     "cosh": cosh,
     "tanh": tanh,
     "sqrt": sqrt,
+    # Fix (suite de regresión v1.1, caso E107): "cbrt" no estaba
+    # registrada — "cbrt(27)" quedaba sin reconocer como función
+    # (multiplicación implícita, "cbrt*27" sin evaluar). SymPy no tiene
+    # una función "cbrt" propia con ese nombre exacto — se define como
+    # x**(Rational(1,3)) (raíz cúbica real de números reales, no la rama
+    # compleja principal — ver Nota de convención más abajo sobre por qué
+    # los exponentes fraccionarios de base negativa dan la rama compleja
+    # en vez de la raíz real, y por qué cbrt() es una excepción
+    # deliberada a esa regla, igual que hacen la mayoría de calculadoras).
+    "cbrt": lambda x, **_: sympy.Piecewise((-((-x) ** sympy.Rational(1, 3)), x < 0), (x ** sympy.Rational(1, 3), True)),
     "log": log,
     "ln": log,
     "exp": exp,

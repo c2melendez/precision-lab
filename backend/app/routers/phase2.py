@@ -77,6 +77,23 @@ async def limit(payload: LimitRequest, request: Request) -> MathResponse:
     except ComplexityLimitError as exc:
         return _error(request, OperationType.LIMIT, ErrorCode.COMPLEXITY_LIMIT, str(exc))
 
+    if result.dne:
+        return MathResponse(
+            success=True,
+            operation=OperationType.LIMIT,
+            request_id=request.state.request_id,
+            result_type=ResultType.SCALAR,
+            input_text=payload.expression,
+            result_text="DNE",
+            result_latex=r"\text{No existe (límite izquierdo } "
+            + sympy.latex(result.left_value)
+            + r" \neq \text{ límite derecho } "
+            + sympy.latex(result.right_value)
+            + ")",
+            has_detailed_steps=False,
+            duration_ms=_duration_ms(request),
+        )
+
     return MathResponse(
         success=True,
         operation=OperationType.LIMIT,

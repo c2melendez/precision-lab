@@ -28,6 +28,16 @@ MAX_SYSTEM_SOLUTIONS = 20  # tope defensivo (sección 7/9: mismo espíritu que o
 class LimitResult:
     input_expr: sympy.Expr
     value: sympy.Expr
+    # Fix (suite de regresión v1.1, caso L010: abs(x)/x en x=0 crasheaba
+    # con INTERNAL_ERROR 500). sympy.limit() con dir="+-" (ambos lados)
+    # LANZA una ValueError de Python cuando el límite lateral izquierdo y
+    # derecho difieren — "no existe" es una respuesta matemática válida,
+    # no un fallo del sistema, así que no debería tumbar el endpoint con
+    # un 500. Este campo lo distingue para que el router lo formatee
+    # como resultado (DNE), no como error.
+    dne: bool = False
+    left_value: sympy.Expr = None
+    right_value: sympy.Expr = None
 
 
 @dataclass
@@ -56,13 +66,29 @@ def _validate_variable(variable: str) -> sympy.Symbol:
 
 
 def compute_limit(expression: str, variable: str, point: str, direction: str) -> LimitResult:
-    """Passthrough trivial: `sympy.limit(expr, var, point, dir=...)` directo."""
+    """Passthrough trivial: `sympy.limit(expr, var, point, dir=...)` directo.
+
+    Fix (suite de regresión v1.1, caso L010: abs(x)/x en x=0 crasheaba
+    con INTERNAL_ERROR 500). Si dir="+-" y los límites laterales
+    difieren, sympy.limit() lanza ValueError en vez de devolver algo —
+    "el límite no existe" es una respuesta matemática válida, no un
+    fallo del sistema. Se atrapa específicamente ESE mensaje (no
+    cualquier ValueError, para no ocultar otros fallos genuinos) y se
+    recalculan los dos límites laterales por separado para reportarlos.
+    """
     input_expr = parsing.parse_expression_tree(expression, allow_equation=False)
     var_symbol = _validate_variable(variable)
     point_expr = parsing.parse_expression_tree(point, allow_equation=False)
 
-    value = sympy.limit(input_expr, var_symbol, point_expr, dir=_DIRECTION_MAP[direction])
-    return LimitResult(input_expr, value)
+    try:
+        value = sympy.limit(input_expr, var_symbol, point_expr, dir=_DIRECTION_MAP[direction])
+        return LimitResult(input_expr, value)
+    except ValueError as exc:
+        if "does not exist" not in str(exc) or direction != "both":
+            raise
+        left = sympy.limit(input_expr, var_symbol, point_expr, dir="-")
+        right = sympy.limit(input_expr, var_symbol, point_expr, dir="+")
+        return LimitResult(input_expr, sympy.nan, dne=True, left_value=left, right_value=right)
 
 
 def compute_series(expression: str, variable: str, point: str, order: int) -> SeriesResult:

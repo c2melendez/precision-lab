@@ -114,7 +114,36 @@ def evaluate(
         return EvaluateResult(expr=expr, input_expr=input_expr, is_numeric=False)
 
     # Sin variables libres sin sustituir -> numérico (sección 6).
+    # Fix (suite de regresión v1.1, caso E147: tan(pi/2) evaluate daba un
+    # número finito gigante en vez de clasificarse como indefinido). El
+    # parser preserva "pi/2" en forma exacta (Rational * pi, no un
+    # Float), pero `expr.evalf()` no simplifica primero — numéricamente
+    # aproxima tan(pi/2) sin darse cuenta de que es una asíntota exacta.
+    # Un `simplify()` SÍ la resuelve a zoo exactamente (trabaja
+    # simbólicamente), pero llamarlo en CADA evaluate (incluso para
+    # expresiones que no tienen ninguna función trig) resultó demasiado
+    # lento en la práctica (~decenas de veces más lento, tumbó el
+    # servidor en la corrida de la suite). Se acota el chequeo caro a
+    # los dos casos donde puede pasar esto: la expresión evalúa a un
+    # número sospechosamente grande, o contiene una función trig directa
+    # aplicada a algo que involucra pi (que es como se cuela un float en
+    # vez de la forma exacta) — evalf() normal sigue siendo el camino
+    # rápido para todo lo demás.
     numeric_value = expr.evalf()
+    needs_pole_check = (
+        numeric_value.is_number
+        and numeric_value.is_finite is not False
+        and not numeric_value.has(sympy.zoo, sympy.oo, -sympy.oo, sympy.nan)
+        and expr.has(sympy.tan, sympy.sec, sympy.csc, sympy.cot)
+        and expr.has(sympy.pi)
+    )
+    if needs_pole_check:
+        try:
+            got_big = abs(complex(numeric_value)) > 1e8
+        except Exception:
+            got_big = False
+        if got_big and sympy.simplify(expr).has(sympy.zoo, sympy.oo, -sympy.oo, sympy.nan):
+            raise DomainErrorResult("El resultado no está definido en este dominio.")
     if numeric_value.has(sympy.zoo, sympy.oo, -sympy.oo, sympy.nan):
         raise DomainErrorResult("El resultado no está definido en este dominio.")
 

@@ -90,7 +90,7 @@ import { ComputeEngine } from "@cortex-js/compute-engine";
 export type CalculusIntent =
   | { kind: "derivative"; variable: string; order: 1 | 2 | 3 | 4 | 5; innerLatex: string }
   | { kind: "integral"; variable: string; lowerBound: string | null; upperBound: string | null; innerLatex: string }
-  | { kind: "limit"; variable: string; point: string; innerLatex: string };
+  | { kind: "limit"; variable: string; point: string; innerLatex: string; direction: "both" | "left" | "right" };
 
 // ---------------------------------------------------------------------
 // Derivada (escáner propio — ver explicación arriba)
@@ -197,9 +197,55 @@ function detectIntegral(latex: string): Extract<CalculusIntent, { kind: "integra
   return { kind: "integral", variable, lowerBound: String(lower), upperBound: String(upper), innerLatex };
 }
 
+/**
+ * Corrección post-auditoría (Módulo 7 del teclado / spec_motor_matematico_
+ * pendiente.md — hallazgo de paridad Lite/Full, no cubierto por ningún
+ * módulo previo): el límite lateral estaba disponible en Lite pero
+ * deshabilitado acá porque Compute Engine 0.58.0 no parsea de forma
+ * confiable la notación \lim_{x\to a^{+/-}} (ver comentario de cabecera).
+ * En vez de depender de Compute Engine para ESTE caso, se usa un escáner
+ * propio sobre el LaTeX crudo — mismo criterio que ya usa detectDerivative
+ * arriba (evitar el motor externo cuando es frágil para un patrón
+ * puntual) y mismo patrón de reconocimiento que normalize.ts en Lite.
+ * Solo reconoce la forma EXACTA que inserta la tecla del teclado
+ * (\lim_{#0\to#1^{#2}}#3) — cualquier otra forma de escribir un límite
+ * lateral a mano sigue cayendo a "no reconocido" y el usuario puede usar
+ * LimitMode.tsx, que siempre soportó dirección vía su propio selector.
+ */
+const LATERAL_LIMIT = /^\\lim_\{\s*([a-zA-Z])\s*\\to\s*(.+?)\s*\^\{\s*([+-])\s*\}\s*\}(.+)$/s;
+
+function detectLateralLimit(latex: string): Extract<CalculusIntent, { kind: "limit" }> | null {
+  const trimmed = latex.trim();
+  const m = LATERAL_LIMIT.exec(trimmed);
+  if (!m) return null;
+  const [, variable, pointLatex, sign, innerLatex] = m;
+  if (innerLatex.trim().length === 0) return null;
+
+  // El punto puede venir como número, o como \infty (mismo criterio que
+  // el resto de este archivo: "oo"/"-oo" ya aceptados por el backend).
+  const pointTrimmed = pointLatex.trim();
+  const point =
+    pointTrimmed === "\\infty"
+      ? "oo"
+      : pointTrimmed === "-\\infty"
+        ? "-oo"
+        : pointTrimmed;
+
+  return {
+    kind: "limit",
+    variable,
+    point,
+    innerLatex: innerLatex.trim(),
+    direction: sign === "+" ? "right" : "left",
+  };
+}
+
 function detectLimit(latex: string): Extract<CalculusIntent, { kind: "limit" }> | null {
   const trimmed = latex.trim();
   if (trimmed.length === 0) return null;
+
+  const lateral = detectLateralLimit(trimmed);
+  if (lateral) return lateral;
 
   let expr;
   try {
@@ -234,7 +280,7 @@ function detectLimit(latex: string): Extract<CalculusIntent, { kind: "limit" }> 
     return null;
   }
 
-  return { kind: "limit", variable, point, innerLatex };
+  return { kind: "limit", variable, point, innerLatex, direction: "both" };
 }
 
 /** Punto de entrada único del router (BasicMode.tsx). Derivada primero

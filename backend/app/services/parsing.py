@@ -29,9 +29,15 @@ from sympy import (
     Pow,
     Symbol,
     acos,
+    acosh,
+    acoth,
+    acsch,
     arg,
+    asech,
     asin,
+    asinh,
     atan,
+    atanh,
     binomial,
     conjugate,
     cos,
@@ -100,6 +106,18 @@ ALLOWED_FUNCTIONS = {
     "sinh": sinh,
     "cosh": cosh,
     "tanh": tanh,
+    # Módulo A (spec_motor_matematico_pendiente.md §2, plantilla de motor
+    # matemático): las 6 hiperbólicas inversas no estaban — verificado
+    # directamente en este diccionario antes del cambio, ninguna de las 6
+    # aparecía. Nativas de SymPy, solo whitelist — sin reescritura (a
+    # diferencia de Lite/Algebrite, que sí necesita rewriteReciprocalFunctions
+    # porque Algebrite no las trae nativas).
+    "asinh": asinh,
+    "acosh": acosh,
+    "atanh": atanh,
+    "asech": asech,
+    "acsch": acsch,
+    "acoth": acoth,
     "sqrt": sqrt,
     # Fix (suite de regresión v1.1, caso E107): "cbrt" no estaba
     # registrada — "cbrt(27)" quedaba sin reconocer como función

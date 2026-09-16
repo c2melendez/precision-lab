@@ -72,3 +72,232 @@
 [data-theme="high-contrast"] * {
   border-width: 2px !important;
 }
+
+/* Módulo 6 (hoja-de-ruta-visual.md §6 / log §7): 4º tema, confirmado por
+ * el usuario con estos tokens exactos (hex → RGB, mismo esquema de
+ * variables que los 3 de arriba). El nombre interno es "saas-blue"
+ * (data-theme="saas-blue"); "Azul SaaS" es la etiqueta visible en
+ * AjustesPopover.tsx. Sistema preparado para sumar los otros 9 temas
+ * propuestos (log §7) sin tocar nada más que agregar un bloque como este
+ * + una entrada en THEMES (AjustesPopover.tsx) — no implementados
+ * todavía, a propósito (fuera de alcance de este módulo).
+ */
+[data-theme="saas-blue"] {
+  --color-chrome: 15 23 42;
+  --color-chrome-soft: 30 41 59;
+  --color-paper: 248 250 252;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 226 232 240;
+  --color-ink: 15 23 42;
+  --color-bone: 241 245 249;
+  --color-marker: 37 99 235;
+  --color-marker-soft: 219 234 254;
+  --color-marker-text: 30 64 175;
+  --color-graph: 13 148 136;
+  --color-graph-soft: 204 251 241;
+  --color-alpha: 124 58 237;
+  --color-alpha-soft: 237 233 254;
+  --color-muted: 100 116 139;
+}
+
+/* Corrección post-auditoría (log de decisiones §7/§9): los 9 temas que
+ * quedaban "propuestos, sin implementar". Azul SaaS (arriba) fue el único
+ * con valores de color confirmados por el usuario; para estos 9 el usuario
+ * pidió explícitamente que se eligieran los colores con buen criterio a
+ * partir de las descripciones de la sección 7 del log, manteniendo el
+ * mismo esquema de 15 variables y las mismas convenciones ya establecidas
+ * por los temas existentes:
+ *  - "paper"/"paper-soft"/"paper-line" siempre claros (la pantalla tipo
+ *    cuaderno se mantiene "de papel" sin importar qué tan oscuro sea el
+ *    resto del tema — mismo criterio que dark/light/high-contrast/saas-blue).
+ *  - Familia OSCURA (chrome oscuro): marker-soft y graph-soft claros,
+ *    alpha-soft oscuro (mismo patrón asimétrico que ya tiene "dark").
+ *  - Familia CLARA (chrome claro): los tres -soft claros (mismo patrón
+ *    que ya tiene "light").
+ *  - Alto contraste: acento único repetido en marker/graph/alpha, igual
+ *    que el "high-contrast" ya existente.
+ */
+
+/* 2. Menta — familia oscura. Chrome verde bosque, marker verde menta. */
+[data-theme="mint"] {
+  --color-chrome: 16 36 28;
+  --color-chrome-soft: 24 50 38;
+  --color-paper: 240 250 244;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 214 235 222;
+  --color-ink: 16 36 28;
+  --color-bone: 220 240 230;
+  --color-marker: 45 191 138;
+  --color-marker-soft: 214 245 232;
+  --color-marker-text: 14 110 76;
+  --color-graph: 58 130 173;
+  --color-graph-soft: 214 232 245;
+  --color-alpha: 191 158 219;
+  --color-alpha-soft: 40 30 54;
+  --color-muted: 150 175 163;
+}
+
+/* 3. Sepia Cuaderno — familia clara (variante clara de "dark"), chrome
+ * marrón café, acentos con el mismo aire cálido que el tema oscuro
+ * original pero atenuados para un fondo claro. */
+[data-theme="sepia"] {
+  --color-chrome: 196 165 130;
+  --color-chrome-soft: 178 145 108;
+  --color-paper: 250 245 235;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 228 216 195;
+  --color-ink: 58 40 24;
+  --color-bone: 74 52 30;
+  --color-marker: 191 120 45;
+  --color-marker-soft: 240 220 195;
+  --color-marker-text: 110 68 20;
+  --color-graph: 92 124 92;
+  --color-graph-soft: 224 232 216;
+  --color-alpha: 130 96 138;
+  --color-alpha-soft: 232 222 236;
+  --color-muted: 124 104 82;
+}
+
+/* 4. Medianoche Púrpura — familia oscura. Chrome casi negro con tinte
+ * violeta, marker lila/magenta. */
+[data-theme="midnight-purple"] {
+  --color-chrome: 18 14 26;
+  --color-chrome-soft: 30 22 42;
+  --color-paper: 248 245 252;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 226 218 236;
+  --color-ink: 20 16 28;
+  --color-bone: 232 222 242;
+  --color-marker: 199 92 214;
+  --color-marker-soft: 245 224 250;
+  --color-marker-text: 122 40 138;
+  --color-graph: 92 158 214;
+  --color-graph-soft: 220 235 250;
+  --color-alpha: 138 122 224;
+  --color-alpha-soft: 40 32 58;
+  --color-muted: 150 138 168;
+}
+
+/* 5. Coral — familia clara. Paper cálido, marker rosa-coral. */
+[data-theme="coral"] {
+  --color-chrome: 232 205 195;
+  --color-chrome-soft: 216 184 172;
+  --color-paper: 255 248 244;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 240 220 210;
+  --color-ink: 60 32 28;
+  --color-bone: 74 42 36;
+  --color-marker: 224 95 107;
+  --color-marker-soft: 250 222 224;
+  --color-marker-text: 150 40 52;
+  --color-graph: 70 140 148;
+  --color-graph-soft: 214 236 236;
+  --color-alpha: 191 118 158;
+  --color-alpha-soft: 245 224 236;
+  --color-muted: 148 108 98;
+}
+
+/* 6. Grafito Monocromo — familia oscura, escala de grises pura. Un solo
+ * acento (blanco) repetido en marker/graph/alpha, mismo criterio que
+ * high-contrast para colapsar los 3 acentos en uno. */
+[data-theme="graphite"] {
+  --color-chrome: 24 24 24;
+  --color-chrome-soft: 38 38 38;
+  --color-paper: 250 250 250;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 220 220 220;
+  --color-ink: 20 20 20;
+  --color-bone: 235 235 235;
+  --color-marker: 235 235 235;
+  --color-marker-soft: 245 245 245;
+  --color-marker-text: 20 20 20;
+  --color-graph: 235 235 235;
+  --color-graph-soft: 245 245 245;
+  --color-alpha: 235 235 235;
+  --color-alpha-soft: 40 40 40;
+  --color-muted: 140 140 140;
+}
+
+/* 7. Ámbar Claro — familia clara (variante clara de "dark"), mismo ámbar
+ * exacto del marker de "dark" (232 163 61) sin diluir, sobre chrome claro. */
+[data-theme="amber-light"] {
+  --color-chrome: 234 224 205;
+  --color-chrome-soft: 220 206 180;
+  --color-paper: 250 246 236;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 228 220 200;
+  --color-ink: 40 32 20;
+  --color-bone: 54 44 26;
+  --color-marker: 232 163 61;
+  --color-marker-soft: 251 239 218;
+  --color-marker-text: 138 90 14;
+  --color-graph: 62 124 116;
+  --color-graph-soft: 228 238 236;
+  --color-alpha: 122 90 168;
+  --color-alpha-soft: 235 224 245;
+  --color-muted: 128 112 86;
+}
+
+/* 8. Cian Tecnológico — familia oscura. Chrome azul casi negro, marker
+ * cian eléctrico, estética terminal. */
+[data-theme="cyan-tech"] {
+  --color-chrome: 8 14 22;
+  --color-chrome-soft: 16 26 38;
+  --color-paper: 240 248 250;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 210 228 232;
+  --color-ink: 10 20 26;
+  --color-bone: 210 238 242;
+  --color-marker: 45 214 224;
+  --color-marker-soft: 214 248 250;
+  --color-marker-text: 10 110 118;
+  --color-graph: 84 224 138;
+  --color-graph-soft: 214 250 228;
+  --color-alpha: 214 92 168;
+  --color-alpha-soft: 34 20 40;
+  --color-muted: 110 148 156;
+}
+
+/* 9. Bosque Profundo — familia oscura. Chrome verde oscuro, marker dorado. */
+[data-theme="deep-forest"] {
+  --color-chrome: 12 28 20;
+  --color-chrome-soft: 20 42 30;
+  --color-paper: 246 248 238;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 220 230 205;
+  --color-ink: 16 32 22;
+  --color-bone: 222 234 210;
+  --color-marker: 214 168 52;
+  --color-marker-soft: 245 232 204;
+  --color-marker-text: 120 88 14;
+  --color-graph: 58 138 108;
+  --color-graph-soft: 214 238 228;
+  --color-alpha: 138 168 90;
+  --color-alpha-soft: 30 40 22;
+  --color-muted: 140 160 130;
+}
+
+/* 10. Alto Contraste Azul — variante de "high-contrast", acento azul en
+ * vez de amarillo. Mismo criterio de accesibilidad: un solo acento,
+ * bordes reforzados, cero grises intermedios. */
+[data-theme="high-contrast-blue"] {
+  --color-chrome: 0 0 0;
+  --color-chrome-soft: 0 0 0;
+  --color-paper: 255 255 255;
+  --color-paper-soft: 255 255 255;
+  --color-paper-line: 0 0 0;
+  --color-ink: 0 0 0;
+  --color-bone: 255 255 255;
+  --color-marker: 64 156 255;
+  --color-marker-soft: 64 156 255;
+  --color-marker-text: 0 0 0;
+  --color-graph: 64 156 255;
+  --color-graph-soft: 64 156 255;
+  --color-alpha: 64 156 255;
+  --color-alpha-soft: 0 0 0;
+  --color-muted: 0 0 0;
+}
+
+[data-theme="high-contrast-blue"] * {
+  border-width: 2px !important;
+}

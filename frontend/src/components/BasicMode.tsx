@@ -38,16 +38,19 @@
  * uso real.
  */
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { MathfieldElement } from "mathlive";
 
 import type { MathResponse } from "../api/client";
 import { submitAndRecord } from "../api/submitWithHistory";
 import { useUIStore } from "../store/useUIStore";
+import { useKeyboardPanelStore } from "../store/useKeyboardPanelStore";
+import { useLayoutModeStore } from "../store/useLayoutModeStore";
 import { CalculatorScreen } from "./CalculatorScreen";
 import { detectCalculusIntent, type CalculusIntent } from "./calculusIntent";
 import { latexToBackendSyntax } from "./NaturalMathField";
 import { NaturalMathKeyboard } from "./NaturalMathKeyboard";
+import { KeyboardBasicPanel } from "./KeyboardBasicPanel";
 import { splitSystemLatex } from "./systemSplit";
 
 interface SubstitutionRow {
@@ -97,16 +100,36 @@ export function BasicMode() {
     setSubstitutions((rows) => rows.filter((_, i) => i !== index));
   }
 
+  // Corrección post-auditoría (Módulo C, spec_motor_matematico_pendiente.md
+  // §4): antes esta función SIEMPRE rechazaba una fila que no tuviera "=",
+  // así que /inequality/system (ya construido en el backend, endpoint
+  // probado de forma aislada) nunca se llamaba desde ningún flujo real.
+  // Ahora se decide la rama según el contenido de las filas: todas
+  // ecuación -> /solve/system (sin cambios); todas inecuación ->
+  // /inequality/system (nuevo); mezcla -> error explícito.
   async function submitSystem(rows: string[]): Promise<void> {
-    const equations = rows.map((row) => latexToBackendSyntax(row));
-    if (equations.some((eq) => eq === "")) {
-      setValidationError("Todas las ecuaciones del sistema deben tener contenido.");
+    const rowsBackend = rows.map((row) => latexToBackendSyntax(row));
+    if (rowsBackend.some((r) => r === "")) {
+      setValidationError("Todas las filas del sistema deben tener contenido.");
       return;
     }
-    if (equations.some((eq) => !eq.includes("="))) {
-      setValidationError("Cada ecuación del sistema debe incluir un signo =.");
+
+    const allInequalities = rowsBackend.every((r) => INEQUALITY_OPERATOR_PATTERN.test(r));
+    const allEquations = rowsBackend.every((r) => !INEQUALITY_OPERATOR_PATTERN.test(r) && r.includes("="));
+
+    if (allInequalities) {
+      await submitInequalitySystem(rowsBackend);
       return;
     }
+
+    if (!allEquations) {
+      setValidationError(
+        'Cada fila del sistema debe ser, todas, ecuaciones (con "=") o, todas, inecuaciones (con <, >, ≤, ≥) — no se puede mezclar ambos tipos en el mismo sistema.',
+      );
+      return;
+    }
+
+    const equations = rowsBackend;
     const variableList = systemVariables
       .split(",")
       .map((v) => v.trim())
@@ -127,6 +150,57 @@ export function BasicMode() {
         { equations, variables: variableList },
         `Sistema: ${equations.join(" ; ")}`,
       );
+      setLastResult(result);
+      if (!result.success) {
+        setErrorMessage(result.error_message ?? "Ocurrió un error.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Alcance confirmado en linear_inequality_system.py (equivalente Full de
+  // linearInequalitySystem.ts en Lite): exactamente 2 variables, sin
+  // importar cuántas inecuaciones haya en el sistema — a diferencia de
+  // submitSystem (ecuaciones) no se exige #variables === #filas.
+  async function submitInequalitySystem(inequalitiesBackend: string[]): Promise<void> {
+    const variableList = systemVariables
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (variableList.length !== 2) {
+      setValidationError(
+        `Un sistema de inecuaciones lineales requiere exactamente 2 variables (hay ${variableList.length} en "Variables del sistema"). Un sistema de 1 variable se resuelve escribiéndolo directo, sin llaves.`,
+      );
+      return;
+    }
+    setValidationError(null);
+
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const result = await submitAndRecord(
+        "/inequality/system",
+        { inequalities: inequalitiesBackend, variables: variableList },
+        `Sistema: ${inequalitiesBackend.join(" ; ")}`,
+      );
+      if (result.success) {
+        // El backend devuelve result_text = "bounded"/"unbounded"/"empty"
+        // (el kind crudo, ver linear_inequality_system.py) y los vértices
+        // en result_data — se arma acá un texto legible antes de mostrarlo,
+        // sin tocar el contrato del backend (mismo criterio de legibilidad
+        // que compute.worker.ts en Lite).
+        const vertices = (result.result_data as string[][] | null) ?? [];
+        const verticesText = vertices.length
+          ? vertices.map(([x, y]) => `(${x}, ${y})`).join(", ")
+          : "sin vértices finitos";
+        result.result_text =
+          result.result_text === "empty"
+            ? "El sistema de inecuaciones no tiene solución (la región factible está vacía)."
+            : result.result_text === "unbounded"
+              ? `Región no acotada. Vértices finitos: ${verticesText}`
+              : `Vértices del polígono factible: ${verticesText}`;
+      }
       setLastResult(result);
       if (!result.success) {
         setErrorMessage(result.error_message ?? "Ocurrió un error.");
@@ -172,11 +246,11 @@ export function BasicMode() {
               )
             : await submitAndRecord(
                 "/limit",
-                // La detección natural solo cubre "both" (ver
-                // calculusIntent.ts — la notación lateral \to a^+/a^- no
-                // se parsea de forma confiable); lateral real sigue
-                // necesitando LimitMode.tsx.
-                { expression: trimmedInner, variable: intent.variable, point: intent.point, direction: "both" },
+                // Corrección post-auditoría: calculusIntent.ts ahora
+                // reconoce la notación lateral con un escáner propio (ver
+                // detectLateralLimit) en vez de depender de Compute Engine
+                // — intent.direction ya trae "left"/"right" cuando aplica.
+                { expression: trimmedInner, variable: intent.variable, point: intent.point, direction: intent.direction },
                 `lim[${intent.variable}->${intent.point}] ${trimmedInner}`,
               );
       setLastResult(result);
@@ -261,10 +335,17 @@ export function BasicMode() {
     formRef.current?.requestSubmit();
   }
 
-  function handleSolveSystem(): void {
+  // Pendiente #2 (revisión post-Módulo D, pedido por el usuario): recibe
+  // la cantidad de ecuaciones elegida en el selector 2-5 de
+  // NaturalMathKeyboard.tsx. Solo se usa para la plantilla nueva — si el
+  // campo YA tiene un sistema escrito, se ignora y se resuelve el
+  // existente (mismo criterio que Lite).
+  function handleSolveSystem(rows: number = 2): void {
     if (!splitSystemLatex(latex)) {
       mathField?.focus();
-      mathField?.insert("\\begin{cases}#0\\\\#1\\end{cases}");
+      const n = Math.min(5, Math.max(2, Math.round(rows)));
+      const placeholders = Array.from({ length: n }, (_, i) => `#${i}`).join("\\\\");
+      mathField?.insert(`\\begin{cases}${placeholders}\\end{cases}`);
       return;
     }
     formRef.current?.requestSubmit();
@@ -274,18 +355,99 @@ export function BasicMode() {
     formRef.current?.requestSubmit();
   }
 
+  // Módulo 0 (paridad con precision-lab-lite): el teclado fijo de
+  // columna 2 desaparece — NaturalMathKeyboard ya no se renderiza inline
+  // aquí, se registra en el store compartido para que <KeyboardDock>
+  // (montado una sola vez en App.tsx) lo muestre dentro de
+  // <KeyboardPanel> cuando el usuario lo abre.
+  //
+  // A diferencia de Lite, handleSolveEquation/handleSolveSystem/
+  // handleSimplify aquí NO están envueltos en useCallback (son funciones
+  // planas, se recrean en cada render) — por eso este efecto corre SIN
+  // arreglo de dependencias (después de cada render), en vez de listar
+  // esas funciones como deps: listarlas sería inútil (cambian de
+  // identidad igual en cada render) y NO dispara el bug de cierre
+  // documentado en useKeyboardPanelStore.ts, porque este efecto nunca
+  // devuelve clearContent() como cleanup — solo actualiza `content`,
+  // nunca toca `isOpen`. El cleanup de desmontaje vive aparte, con
+  // deps `[]`, para que se dispare una sola vez.
+  const setKeyboardContent = useKeyboardPanelStore((s) => s.setContent);
+  const clearKeyboardContent = useKeyboardPanelStore((s) => s.clearContent);
+  const setBasicKeyboardContent = useKeyboardPanelStore((s) => s.setBasicContent);
+  const clearBasicKeyboardContent = useKeyboardPanelStore((s) => s.clearBasicContent);
+  const setCompactActions = useKeyboardPanelStore((s) => s.setCompactActions);
+  const clearCompactActions = useKeyboardPanelStore((s) => s.clearCompactActions);
+  const layoutMode = useLayoutModeStore((s) => s.layoutMode);
+
+  // Módulo 1: hideCoreGrid evita duplicar en el panel expandido lo que
+  // ahora vive en KeyboardBasicPanel/dock — ver comentario de cabecera
+  // en NaturalMathKeyboard.tsx (GraphMode, que comparte este mismo
+  // componente, NO pasa este prop y sigue viendo el teclado completo).
+  useEffect(() => {
+    setKeyboardContent(
+      <NaturalMathKeyboard
+        field={mathField}
+        onSubmit={() => formRef.current?.requestSubmit()}
+        onClearField={() => setLatex("")}
+        onSolveEquation={handleSolveEquation}
+        onSolveSystem={handleSolveSystem}
+        onSimplify={handleSimplify}
+        showCalculusStrip
+        hideCoreGrid
+      />,
+    );
+  });
+
+  useEffect(() => {
+    return () => clearKeyboardContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setBasicKeyboardContent(
+      <KeyboardBasicPanel
+        field={mathField}
+        onSubmit={() => formRef.current?.requestSubmit()}
+        lastAnswerLatex={lastResult?.result_latex ?? null}
+      />,
+    );
+  });
+
+  useEffect(() => {
+    return () => clearBasicKeyboardContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Corrección post-Módulo 7: fila compacta del dock en móvil necesita
+  // los mismos callbacks que KeyboardBasicPanel, expuestos aparte.
+  useEffect(() => {
+    setCompactActions({
+      onEnter: () => formRef.current?.requestSubmit(),
+      onBackspace: () => {
+        mathField?.focus();
+        mathField?.executeCommand("deleteBackward");
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mathField]);
+
+  useEffect(() => {
+    return () => clearCompactActions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <form
       ref={formRef}
       onSubmit={handleSubmit}
       aria-labelledby="basic-mode-heading"
-      className="mx-auto max-w-lg space-y-6 lg:max-w-3xl lg:grid lg:grid-cols-[1.4fr_1fr] lg:items-start lg:gap-6 lg:space-y-0 dt:max-w-4xl dt:gap-10"
+      className="mx-auto max-w-lg space-y-6 lg:max-w-3xl dt:max-w-4xl"
     >
       <h2 id="basic-mode-heading" className="sr-only">
         Básico
       </h2>
 
-      <div className="space-y-6 lg:col-start-1">
+      <div className="space-y-6">
         <CalculatorScreen
           latex={latex}
           onLatexChange={setLatex}
@@ -297,6 +459,7 @@ export function BasicMode() {
           result={lastResult}
           isLoading={isLoading}
           onClearField={() => setLatex("")}
+          layoutMode={layoutMode}
         />
 
         {systemRows && (
@@ -319,18 +482,6 @@ export function BasicMode() {
             {validationError}
           </p>
         )}
-      </div>
-
-      <div className="lg:col-start-2">
-        <NaturalMathKeyboard
-          field={mathField}
-          onSubmit={() => formRef.current?.requestSubmit()}
-          onClearField={() => setLatex("")}
-          onSolveEquation={handleSolveEquation}
-          onSolveSystem={handleSolveSystem}
-          onSimplify={handleSimplify}
-          showCalculusStrip
-        />
       </div>
 
       <div className="space-y-6 lg:col-span-2">

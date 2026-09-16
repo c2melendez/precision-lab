@@ -62,21 +62,47 @@ import type { MathfieldElement } from "mathlive";
 import { useState } from "react";
 import { KeyGlyph, type Glyph, BOX } from "./KeyGlyph";
 
-interface KeyDef {
+/** Acción de long-press (Módulo 0) — mismo campo que en Lite (paridad),
+ * ver comentario completo en MathKeyboard.tsx de precision-lab-lite. Sin
+ * consumidores todavía en este archivo. */
+export type KeySecondaryAction = { type: "glyph"; value: Glyph } | { type: "template"; latex: string };
+
+export interface KeyDef {
   glyph: Glyph;
   insertLatex: string;
   ariaLabel: string;
   /** Sin cómputo real detrás (∂/∂x) — presionarla muestra un aviso en
    * vez de insertar algo que el backend no puede resolver. */
   unavailable?: boolean;
+  /** Módulo 0: campo nuevo, opcional, sin consumidores todavía. */
+  secondaryAction?: KeySecondaryAction;
 }
 
-const key = (glyph: Glyph, insertLatex: string, ariaLabel: string, unavailable?: boolean): KeyDef => ({
+export const key = (
+  glyph: Glyph,
+  insertLatex: string,
+  ariaLabel: string,
+  unavailable?: boolean,
+  secondaryAction?: KeySecondaryAction,
+): KeyDef => ({
   glyph,
   insertLatex,
   ariaLabel,
   unavailable,
+  secondaryAction,
 });
+
+export { BOX };
+
+// MÓDULO 1 (paridad con precision-lab-lite): CORE_GRID/RELATIONAL_ROW/
+// SYMBOLS_ROW_2 se DEJAN INTACTOS aquí (no se borran) porque este mismo
+// componente lo usa GraphMode.tsx (spec §11: "Gráficas sin tocar"),
+// alcanzable y en producción — a diferencia de precision-lab-lite, donde
+// los únicos otros consumidores eran código muerto. Se agrega un prop
+// nuevo `hideCoreGrid` (default false): BasicMode lo activa para no
+// duplicar lo que ahora vive en KeyboardBasicPanel/dock; GraphMode no lo
+// pasa, así que sigue viendo exactamente el mismo teclado de siempre.
+
 
 // ---- P3 (spec v2 §4.5): núcleo fijo, siempre visible, 7 columnas × 4
 // filas. Reemplaza a BASE_GRID+NUMPAD. Mismas plantillas de inserción que
@@ -141,6 +167,13 @@ const SYMBOLS_ROW_1: KeyDef[] = [
   key("DEL", "", "borrar todo el campo"),
 ];
 
+// Módulo 3 (spec §5.2): para BasicMode (hideCoreGrid=true), x²/xʸ/√/∛/
+// 10ˣ/exp/|x|/n! se reubican a Álgebra — SYMBOLS_ROW_1 completa queda
+// SOLO para GraphMode (spec §11, sin tocar), que sigue viendo la fila de
+// siempre. Mismo criterio que CORE_GRID en el Módulo 1: no se borra
+// nada del archivo, se selecciona cuál fila renderizar según el modo.
+const SYMBOLS_ROW_1_BASIC_MODE: KeyDef[] = [key("DEL", "", "borrar todo el campo")];
+
 const SYMBOLS_ROW_2: KeyDef[] = [
   key({ italic: "i" }, "i", "número imaginario"),
   key("π", "\\pi", "pi"),
@@ -197,7 +230,10 @@ const CALCULUS_ROW_2: KeyDef[] = [
   key({ frac: ["∂", "∂x"] }, "", "derivada parcial", true),
   key({ base: "lim", sub: "x→a" }, "\\lim_{#0\\to#1}#2", "límite"),
   key({ base: "lim", sub: "x→∞" }, "\\lim_{#0\\to\\infty}#1", "límite al infinito"),
-  key({ base: "lim", sub: "x→a±" }, "", "límite lateral (todavía no disponible en este backend)", true),
+  // Corrección post-auditoría (hallazgo de paridad Lite/Full): ya no
+  // `unavailable` — calculusIntent.ts ahora reconoce esta notación con un
+  // escáner propio (ver detectLateralLimit), mismo template que Lite.
+  key({ base: "lim", sub: "x→a±" }, "\\lim_{#0\\to#1^{#2}}#3", "límite lateral (edita + o - en el exponente)"),
 ];
 
 // Decisión final de Carlos (post-P6/P7): "Logarítmicas" y "Constantes" se
@@ -216,6 +252,23 @@ const CATEGORY_MENUS: Record<string, { section: string; keys: KeyDef[] }[]> = {
     {
       section: "Hiperbólicas",
       keys: ["sinh", "cosh", "tanh", "csch", "sech", "coth"].map((f) => key(f, `${f}\\left(#0\\right)`, f)),
+    },
+    // Módulo A (spec_motor_matematico_pendiente.md §2, activación pedida
+    // por el usuario): las 6 ya están en ALLOWED_FUNCTIONS del backend
+    // (agregado en el cierre del Módulo A, verificado con ejecución real
+    // en Python). Lo que NO pude verificar acá (nivel 3, sin mathlive
+    // real instalado en este entorno): qué texto ASCII exacto produce
+    // `convertLatexToAsciiMath` para "sinh^{-1}(...)" — no hay ninguna
+    // capa de conversión propia para esto en NaturalMathField.tsx (grep
+    // confirmado, cero coincidencias de "^{-1}" ahí). Activo las 6 con el
+    // mismo criterio que ya usa "Inversas" (sin⁻¹ etc., que sí está en
+    // producción sin conversión propia) — mismo mecanismo, mismo nivel de
+    // riesgo heredado, no uno nuevo que yo introduzca.
+    {
+      section: "Hiperbólicas inversas",
+      keys: ["sinh", "cosh", "tanh", "csch", "sech", "coth"].map((f) =>
+        key({ sup: "-1", base: f }, `${f}^{-1}\\left(#0\\right)`, `${f} inversa`),
+      ),
     },
   ],
 };
@@ -243,14 +296,82 @@ CATEGORY_MENUS.Complejos = [
   },
 ];
 
-const CATEGORIES = ["Trigonométricas", "Símbolos", "Complejos"] as const;
+// Módulo 3 (spec §5.2 / log §3.2 y §5): categoría Álgebra, 5 secciones —
+// reemplaza a la pestaña temporal "Funciones" del Módulo 1. Mismo
+// contenido y misma colocación provisional de ±() que en Lite (paridad
+// obligatoria) — ver el comentario completo en MathKeyboard.tsx de ese
+// repo. Diferencia real: aquí NO verifiqué la conversión LaTeX→backend
+// de \log_{2}(...) con ejecución real (no hay mathlive/compute-engine
+// instalados, y convertLatexToAsciiMath es una caja negra de esa
+// librería) — pero \log_{#0}\left(#1\right) (log con base variable) ya
+// existía en el código ANTES de este módulo (vivía en CORE_GRID), así
+// que log₂ hereda el mismo camino de conversión que ya estaba en
+// producción, con una base fija "2" en vez de un placeholder editable —
+// no es un riesgo nuevo introducido por este módulo.
+CATEGORY_MENUS.Álgebra = [
+  {
+    section: "Logaritmos",
+    keys: [
+      key("ln", "\\ln\\left(#0\\right)", "logaritmo natural"),
+      key("log", "\\log\\left(#0\\right)", "logaritmo base 10"),
+      key({ sub: BOX, base: "log" }, "\\log_{#0}\\left(#1\\right)", "logaritmo con base"),
+      key("log₂", "\\log_{2}\\left(#0\\right)", "logaritmo base 2"),
+    ],
+  },
+  {
+    section: "Exponenciales",
+    keys: [
+      key({ sup: "n", base: "e" }, "e^{#0}", "e a la n"),
+      key({ sup: "n", base: "10" }, "10^{#0}", "10 a la n"),
+      key({ sup: "2", base: BOX }, "#0^2", "a al cuadrado"),
+      key({ sup: "n", base: BOX }, "#0^{#1}", "a a la n"),
+      key("exp", "\\exp\\left(#0\\right)", "exponencial"),
+    ],
+  },
+  {
+    section: "Radicales",
+    keys: [
+      key({ sqrt: BOX }, "\\sqrt{#0}", "raíz cuadrada de a"),
+      key({ sqrt: BOX, index: BOX }, "\\sqrt[#0]{#1}", "raíz de índice n editable"),
+    ],
+  },
+  {
+    section: "Generales",
+    keys: [
+      key("|a|", "\\left|#0\\right|", "valor absoluto de a"),
+      key("a!", "#0!", "factorial de a"),
+    ],
+  },
+  {
+    // Renderizado aparte — ver "openCategory === Álgebra" en el JSX.
+    section: "Ecuaciones",
+    keys: [],
+  },
+];
+
+// Módulo 4 (spec §5.3 / log §3.3): categoría Cálculo, 4 secciones — todo
+// contenido YA existente (CALCULUS_ROW_1/2), solo reagrupado como
+// pestaña propia. Mismas teclas, sin reescribir plantillas. LCM/GCD NO
+// se repiten aquí (ya viven en Álgebra > Ecuaciones, Módulo 3).
+CATEGORY_MENUS.Cálculo = [
+  { section: "Integrales", keys: CALCULUS_ROW_1.slice(0, 2) },
+  { section: "Sumas y productos", keys: CALCULUS_ROW_1.slice(2, 4) },
+  { section: "Derivadas", keys: CALCULUS_ROW_2.slice(0, 4) },
+  { section: "Límites", keys: CALCULUS_ROW_2.slice(4, 7) },
+];
+
+const CATEGORIES_FULL = ["Trigonométricas", "Símbolos", "Complejos"] as const;
+const CATEGORIES_BASIC_MODE = ["Trigonométricas", "Álgebra", "Cálculo", "Símbolos", "Complejos"] as const;
 
 interface NaturalMathKeyboardProps {
   field: MathfieldElement | null;
   onSubmit?: () => void;
   onClearField?: () => void;
   onSolveEquation?: () => void;
-  onSolveSystem?: () => void;
+  /** Pendiente #2 (revisión post-Módulo D): recibe la cantidad de
+   * ecuaciones elegida en el selector 2-5 que se abre al tocar
+   * "Sistema" (mismo criterio que Lite, paridad). */
+  onSolveSystem?: (rows?: number) => void;
   onSimplify?: () => void;
   /** Fase 0 v2 (decisión de Carlos), ya no necesaria para la tira de
    * Cálculo (ver cabecera del archivo) — se deja como prop opcional por
@@ -259,7 +380,16 @@ interface NaturalMathKeyboardProps {
   /** La tira de Cálculo solo tiene sentido donde el campo es una
    * expresión libre resuelta vía calculusIntent (Básico). Default false. */
   showCalculusStrip?: boolean;
+  /** Módulo 1: true para BasicMode — oculta CORE_GRID/RELATIONAL_ROW/
+   * SYMBOLS_ROW_2 (ya viven en KeyboardBasicPanel, dentro del dock) y
+   * agrega la pestaña temporal "Funciones". Default false — GraphMode
+   * (spec §11, sin tocar) no lo pasa, ve el teclado completo de siempre. */
+  hideCoreGrid?: boolean;
 }
+
+/** Cuántas filas puede pedir el selector de "Sistema" — spec §6 (5×5 ya
+ * verificado en el Módulo B del motor). Paridad con Lite. */
+const SYSTEM_ROW_OPTIONS = [2, 3, 4, 5];
 
 export function NaturalMathKeyboard({
   field,
@@ -270,9 +400,13 @@ export function NaturalMathKeyboard({
   onSimplify,
   onGoToDerivative: _onGoToDerivative,
   showCalculusStrip = false,
+  hideCoreGrid = false,
 }: NaturalMathKeyboardProps) {
+  const CATEGORIES = hideCoreGrid ? CATEGORIES_BASIC_MODE : CATEGORIES_FULL;
   const [openCategory, setOpenCategory] = useState<(typeof CATEGORIES)[number] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Pendiente #2: menú chico "¿cuántas ecuaciones?" al tocar "Sistema".
+  const [showSystemSizeMenu, setShowSystemSizeMenu] = useState(false);
 
   function press(k: KeyDef): void {
     if (k.unavailable) {
@@ -316,7 +450,7 @@ export function NaturalMathKeyboard({
           {openCategory === "Símbolos" ? (
             <div className="flex flex-col gap-1">
               <div className="grid grid-cols-9 gap-1">
-                {SYMBOLS_ROW_1.map((k, i) => (
+                {(hideCoreGrid ? SYMBOLS_ROW_1_BASIC_MODE : SYMBOLS_ROW_1).map((k, i) => (
                   <button
                     key={`sym1-${i}`}
                     type="button"
@@ -328,44 +462,133 @@ export function NaturalMathKeyboard({
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-9 gap-1">
-                {SYMBOLS_ROW_2.map((k, i) => (
-                  <button
-                    key={`sym2-${i}`}
-                    type="button"
-                    onClick={() => pressSymbol(k)}
-                    aria-label={k.ariaLabel}
-                    className="rounded-md bg-chrome py-2 text-[11px] text-bone hover:bg-chrome/70"
-                  >
-                    <KeyGlyph glyph={k.glyph} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            CATEGORY_MENUS[openCategory].map((group) => (
-              <div key={group.section} className="mb-2 last:mb-0">
-                <div className="mb-1.5 text-[9px] uppercase tracking-wide text-bone/50">{group.section}</div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {group.keys.map((k, i) => (
+              {/* SYMBOLS_ROW_2 solo cuando NO se ocultó el núcleo — en
+                  BasicMode ya no tiene contenido relevante (todo
+                  reubicado al panel básico, Módulo 1). */}
+              {!hideCoreGrid && (
+                <div className="grid grid-cols-9 gap-1">
+                  {SYMBOLS_ROW_2.map((k, i) => (
                     <button
-                      key={`${group.section}-${i}`}
+                      key={`sym2-${i}`}
                       type="button"
-                      onClick={() => press(k)}
+                      onClick={() => pressSymbol(k)}
                       aria-label={k.ariaLabel}
-                      className="rounded-md bg-marker-soft/10 py-2 text-sm text-marker hover:bg-marker-soft/20"
+                      className="rounded-md bg-chrome py-2 text-[11px] text-bone hover:bg-chrome/70"
                     >
                       <KeyGlyph glyph={k.glyph} />
                     </button>
                   ))}
                 </div>
-              </div>
-            ))
+              )}
+            </div>
+          ) : (
+            CATEGORY_MENUS[openCategory].map((group) =>
+              group.section === "Ecuaciones" ? (
+                <div key={group.section} className="mb-2 last:mb-0">
+                  <div className="mb-1.5 text-[9px] uppercase tracking-wide text-bone/50">{group.section}</div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSolveEquation?.();
+                        setOpenCategory(null);
+                      }}
+                      aria-label="Resolver ecuación"
+                      className="rounded-md bg-marker-soft/10 py-2 text-xs text-marker hover:bg-marker-soft/20"
+                    >
+                      f(x)=0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSolveEquation?.();
+                        setOpenCategory(null);
+                      }}
+                      aria-label="Resolver inecuación"
+                      className="rounded-md bg-marker-soft/10 py-2 text-xs text-marker hover:bg-marker-soft/20"
+                    >
+                      f(x)&gt;0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenCategory(null);
+                        setShowSystemSizeMenu(true);
+                      }}
+                      aria-label="Resolver sistema de ecuaciones"
+                      className="rounded-md bg-alpha-soft py-2 text-xs text-alpha hover:bg-alpha-soft/80"
+                    >
+                      Sistema
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Corrección post-auditoría (Módulo C): BasicMode.tsx
+                        // ya detecta solo si un \begin{cases} es de ecuaciones
+                        // o de inecuaciones (ver submitSystem) — esta tecla usa
+                        // la MISMA plantilla/selector que "Sistema", solo con
+                        // un rótulo que deja claro que también acepta <, >, ≤, ≥.
+                        setOpenCategory(null);
+                        setShowSystemSizeMenu(true);
+                      }}
+                      aria-label="Sistema de inecuaciones — escribe inecuaciones dentro de las llaves"
+                      className="rounded-md bg-alpha-soft py-2 text-[10px] text-alpha hover:bg-alpha-soft/80"
+                    >
+                      Sist. inecuaciones
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSimplify?.();
+                        setOpenCategory(null);
+                      }}
+                      aria-label="Simplificar expresión"
+                      className="rounded-md bg-graph/15 py-2 text-xs text-graph hover:bg-graph/25"
+                    >
+                      a+a → 2a
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => press(key("LCM", "\\mathrm{lcm}\\left(#0,#1\\right)", "mínimo común múltiplo"))}
+                      aria-label="Mínimo común múltiplo"
+                      className="rounded-md border border-marker bg-marker-soft/10 py-2 text-xs font-medium text-marker hover:bg-marker-soft/20"
+                    >
+                      LCM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => press(key("GCD", "\\gcd\\left(#0,#1\\right)", "máximo común divisor"))}
+                      aria-label="Máximo común divisor"
+                      className="rounded-md border border-marker bg-marker-soft/10 py-2 text-xs font-medium text-marker hover:bg-marker-soft/20"
+                    >
+                      GCD
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div key={group.section} className="mb-2 last:mb-0">
+                  <div className="mb-1.5 text-[9px] uppercase tracking-wide text-bone/50">{group.section}</div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {group.keys.map((k, i) => (
+                      <button
+                        key={`${group.section}-${i}`}
+                        type="button"
+                        onClick={() => press(k)}
+                        aria-label={k.ariaLabel}
+                        className="rounded-md bg-marker-soft/10 py-2 text-sm text-marker hover:bg-marker-soft/20"
+                      >
+                        <KeyGlyph glyph={k.glyph} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ),
+            )
           )}
         </div>
       )}
 
-      <div className="mb-1.5 grid grid-cols-3 gap-1.5">
+      <div className="relative mb-1.5 grid grid-cols-3 gap-1.5">
         <button
           type="button"
           onClick={onSolveEquation}
@@ -376,8 +599,9 @@ export function NaturalMathKeyboard({
         </button>
         <button
           type="button"
-          onClick={onSolveSystem}
-          aria-label="Resolver sistema de ecuaciones"
+          onClick={() => setShowSystemSizeMenu((v) => !v)}
+          aria-expanded={showSystemSizeMenu}
+          aria-label="Resolver sistema de ecuaciones — elegir cantidad"
           className="flex items-center justify-center gap-1 rounded-md bg-alpha-soft py-2 text-[10px] font-medium text-alpha hover:bg-alpha-soft/80"
         >
           <span className="text-base font-light">{"{"}</span>
@@ -387,6 +611,25 @@ export function NaturalMathKeyboard({
             g(x)=0
           </span>
         </button>
+        {showSystemSizeMenu && (
+          <div className="absolute left-1/3 top-full z-10 mt-1 flex gap-1 rounded-md bg-chrome-soft p-1.5 shadow-lg">
+            <span className="self-center px-1 text-[10px] text-bone/60">Ecuaciones:</span>
+            {SYSTEM_ROW_OPTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  onSolveSystem?.(n);
+                  setShowSystemSizeMenu(false);
+                }}
+                aria-label={`Sistema de ${n} ecuaciones`}
+                className="h-6 w-6 rounded bg-alpha-soft text-xs font-medium text-alpha hover:bg-alpha-soft/70"
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           onClick={onSimplify}
@@ -397,7 +640,11 @@ export function NaturalMathKeyboard({
         </button>
       </div>
 
-      {showCalculusStrip && (
+      {/* Módulo 4: además de showCalculusStrip (ya existía, GraphMode
+          nunca lo pasa), ahora también se apaga con hideCoreGrid=true
+          (BasicMode) — su contenido (menos LCM/GCD, ya en Álgebra >
+          Ecuaciones) vive en la pestaña "Cálculo" nueva. */}
+      {showCalculusStrip && !hideCoreGrid && (
         <div className="relative mb-1.5 rounded-lg bg-chrome-soft/60 p-1.5">
           <div className="mb-1 grid grid-cols-6 gap-1">
             {CALCULUS_ROW_1.map((k, i) => (
@@ -463,49 +710,52 @@ export function NaturalMathKeyboard({
         ))}
       </div>
 
-      {/* Núcleo fijo (P3 §4.5): 7 columnas × 4 filas, siempre visible.
-          Estilo §4.7: números (fondo neutro oscuro), funciones (mismo
-          fondo, texto ámbar), operadores ×/−/+/÷ (fondo ámbar sólido),
-          = (contorno ámbar), ↵ (fondo azul sólido). */}
-      {CORE_GRID.map((row, i) => (
-        <div key={i} className="mb-1.5 grid grid-cols-7 gap-1">
-          {row.map((k, j) => {
-            const glyphStr = String(k.glyph);
-            const isDigit = /^[0-9.%]$/.test(glyphStr);
-            const isOperator = ["×", "−", "+", "÷"].includes(glyphStr);
-            const isEquals = glyphStr === "=";
-            const isEnter = glyphStr === "⏎";
-            const className = isEnter
-              ? "rounded-md bg-graph py-2.5 text-sm font-semibold text-paper hover:bg-graph/90"
-              : isEquals
-                ? "rounded-md border border-marker py-2.5 text-sm font-medium text-marker hover:bg-marker-soft/10"
-                : isOperator
-                  ? "rounded-md bg-marker py-2.5 text-base font-semibold text-chrome hover:bg-marker/90"
-                  : isDigit
-                    ? "rounded-md bg-chrome-soft/80 py-2.5 text-sm font-medium text-bone hover:bg-chrome-soft/60"
-                    : "rounded-md bg-chrome-soft py-2.5 text-[11px] text-marker hover:bg-chrome-soft/70";
-            return (
-              <button key={j} type="button" onClick={() => pressBase(k)} aria-label={k.ariaLabel} className={className}>
+      {/* Núcleo fijo + relacionales — ocultos cuando hideCoreGrid=true
+          (BasicMode: viven en KeyboardBasicPanel/dock). GraphMode nunca
+          pasa este prop, así que sigue viendo exactamente esto. */}
+      {!hideCoreGrid && (
+        <>
+          {CORE_GRID.map((row, i) => (
+            <div key={i} className="mb-1.5 grid grid-cols-7 gap-1">
+              {row.map((k, j) => {
+                const glyphStr = String(k.glyph);
+                const isDigit = /^[0-9.%]$/.test(glyphStr);
+                const isOperator = ["×", "−", "+", "÷"].includes(glyphStr);
+                const isEquals = glyphStr === "=";
+                const isEnter = glyphStr === "⏎";
+                const className = isEnter
+                  ? "rounded-md bg-graph py-2.5 text-sm font-semibold text-paper hover:bg-graph/90"
+                  : isEquals
+                    ? "rounded-md border border-marker py-2.5 text-sm font-medium text-marker hover:bg-marker-soft/10"
+                    : isOperator
+                      ? "rounded-md bg-marker py-2.5 text-base font-semibold text-chrome hover:bg-marker/90"
+                      : isDigit
+                        ? "rounded-md bg-chrome-soft/80 py-2.5 text-sm font-medium text-bone hover:bg-chrome-soft/60"
+                        : "rounded-md bg-chrome-soft py-2.5 text-[11px] text-marker hover:bg-chrome-soft/70";
+                return (
+                  <button key={j} type="button" onClick={() => pressBase(k)} aria-label={k.ariaLabel} className={className}>
+                    <KeyGlyph glyph={k.glyph} />
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+
+          <div className="grid grid-cols-4 gap-1">
+            {RELATIONAL_ROW.map((k, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => press(k)}
+                aria-label={k.ariaLabel}
+                className="rounded-md bg-paper-soft py-1.5 text-sm text-ink hover:bg-paper-line/60"
+              >
                 <KeyGlyph glyph={k.glyph} />
               </button>
-            );
-          })}
-        </div>
-      ))}
-
-      <div className="grid grid-cols-4 gap-1">
-        {RELATIONAL_ROW.map((k, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => press(k)}
-            aria-label={k.ariaLabel}
-            className="rounded-md bg-paper-soft py-1.5 text-sm text-ink hover:bg-paper-line/60"
-          >
-            <KeyGlyph glyph={k.glyph} />
-          </button>
-        ))}
-      </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

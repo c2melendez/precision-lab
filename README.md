@@ -8,6 +8,26 @@ Wolfram Alpha en UX, sin pretender su cobertura completa desde esta entrega.
 > completos). Se escribió incrementalmente, un módulo a la vez, y se cierra
 > aquí contra el checklist completo de la sección 16 de la spec.
 
+## Alcance actual del motor (verificado, auditoría de septiembre 2026)
+
+Motor: SymPy, backend FastAPI (`backend/app/services/`). Auditado contra `spec_motor_matematico_pendiente.md` y `spec_teclado_virtual.md` con `pytest`, `tsc --noEmit`, `npx vitest run` y `npm run build` reales (backend y frontend), y llamadas en vivo al servidor — no solo lectura de código.
+
+- **Hiperbólicas inversas recíprocas** (`asech`, `acsch`, `acoth`) — nativas de SymPy, agregadas a `ALLOWED_FUNCTIONS` (`app/services/parsing.py`) junto con `asinh/acosh/atanh`. Paridad numérica verificada en vivo contra `precision-lab-lite` para los mismos inputs (coincide hasta ~15 cifras).
+- **Sistema de ecuaciones lineales, hasta 5×5** (`/solve/system`) — verificado en vivo: único, compatible indeterminado (solución paramétrica con variable libre) e incompatible (`result_data: []` + warning explícito) se distinguen correctamente, nunca un "no resuelto" genérico.
+- **Sistema de inecuaciones lineales** (`/inequality/system`, `app/services/linear_inequality_system.py`) — mismo diseño que Lite: exactamente 2 variables, vértices del polígono factible, 3 estados (`bounded`/`unbounded`/`empty`). Sistemas no lineales o de 3+ variables se rechazan con `VALIDATION_ERROR` explícito.
+  - **Corrección de auditoría** (mismo bug, mismo fix que en Lite, para mantener paridad): el diseño original confundía una región **vacía** (rectas paralelas sin intersección factible) con una región **no acotada** (franja infinita) cuando ambas dan 0 vértices, porque el chequeo de acotación original no verificaba la factibilidad real, solo el cono de recesión. Reemplazado por recorte de semiplanos (Sutherland-Hodgman) contra una caja grande. Ver `backend/tests/test_modulos_abc_auditoria.py`.
+- **Notación de grados D°M′S″** — el backend no parsea `°` directamente; el frontend (`NaturalMathField.tsx`) convierte `D°M′S″`/`°` a `(...)*pi/180` (mismo criterio que Lite) antes de enviar la expresión a `/evaluate`. Verificado en vivo contra valores conocidos (`90° = π/2 rad`, `45°30′ = 45.5°`).
+
+**Pendiente de confirmación con el usuario:** igual que en Lite, el diseño de la Fase C (vértices, 2 variables, steps en dos niveles) se documenta en el código como "confirmado explícitamente" sin que se pueda verificar esa confirmación desde el código en sí.
+
+**Hallazgos de calidad de test corregidos en esta auditoría:**
+- `tests/test_phase2.py` tenía 2 aserciones obsoletas (`test_solve_system_is_unsupported_stub`, `test_inequality_is_unsupported_stub`) que asumían que `/solve/system` e `/inequality` seguían siendo stubs "no soportado" — ya son funcionalidad real desde antes de esta auditoría. Actualizadas para reflejar el comportamiento actual sin perder su verificación original (que una inyección tipo `eval(1)=0` se rechaza con `PARSE_ERROR`).
+- `frontend/src/types/api.ts` (generado desde el OpenAPI del backend) estaba desactualizado — no incluía `inequality_system`, rompiendo el `typecheck` del frontend. Regenerado contra el backend real.
+- `frontend/src/api/client.ts` — `ENDPOINT_TO_OPERATION` no tenía la entrada para `/inequality/system`.
+- Un test de `BasicMode.test.tsx` (clic en la tecla "derivada") no se había actualizado tras el rediseño del teclado (la tecla ahora vive en un store compartido, no inline en el modo) — actualizado para reflejar la arquitectura nueva.
+
+**Estado verificado al cierre de esta auditoría:** backend `pytest` 189/194 (5 fallas preexistentes, fuera de alcance — `integral/improper`, `graph/3d`, `graph/parametric`, `derivative/partial`, `derivative/implicit`, todavía sin implementar); frontend `tsc --noEmit` limpio, `npx vitest run` 150/150, `npm run build` limpio (mismo warning preexistente de tamaño de chunk).
+
 ## Correcciones post-entrega
 
 Aplicadas sobre el paquete final tras una auditoría de conformidad contra la

@@ -53,6 +53,10 @@ class OperationType(str, Enum):
     STATISTICS_COMBINATORICS = "statistics_combinatorics"
     STATISTICS_BINOMIAL = "statistics_binomial"
     STATISTICS_NORMAL = "statistics_normal"
+    # Pendiente #5 (revisión post-Módulo D del track de motor matemático,
+    # pedido por el usuario): sistema de inecuaciones lineales,
+    # equivalente Full/SymPy del ya construido en Lite.
+    INEQUALITY_SYSTEM = "inequality_system"
 
 
 class MatrixOpKind(str, Enum):
@@ -79,6 +83,12 @@ class ResultType(str, Enum):
     GRAPH = "graph"
     IDENTITY = "identity"
     CONTRADICTION = "contradiction"
+    # Pendiente #5: el resultado NO es un valor escalar — es "bounded" /
+    # "unbounded" / "empty" (en result_text) + vértices del polígono
+    # factible (en result_data, como List[List[str]] — reutiliza el tipo
+    # ya existente en MathResponse.result_data en vez de ampliar el
+    # Union, cada vértice es ["x", "y"] como strings).
+    INEQUALITY_REGION = "inequality_region"
 
 
 class ErrorCode(str, Enum):

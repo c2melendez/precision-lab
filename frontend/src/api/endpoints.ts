@@ -39,6 +39,11 @@ export const KNOWN_ENDPOINTS = [
   // --- Fase 2 (passthrough trivial real o UNSUPPORTED_IN_PHASE_1) ---
   "/solve/system",
   "/inequality",
+  // Corrección post-auditoría (Módulo C): el endpoint ya existía en el
+  // backend (router phase2.py) pero faltaba en esta whitelist mantenida a
+  // mano — sin esto, callApi() lo hubiera rechazado en runtime aunque el
+  // resto del wiring de BasicMode.tsx estuviera correcto.
+  "/inequality/system",
   "/limit",
   "/series",
   "/matrix/eigen",

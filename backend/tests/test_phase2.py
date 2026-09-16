@@ -69,26 +69,32 @@ def test_matrix_eigen_passthrough_real():
 # ---------------------------------------------------------------------------
 
 
-def test_solve_system_is_unsupported_stub():
+# Corrección post-auditoría: /solve/system y /inequality dejaron de ser
+# stubs de la Fase 1 (Módulo B y trabajo de una sesión anterior,
+# respectivamente) — ver tests/test_modulos_abc_auditoria.py para la
+# cobertura real de /solve/system (incluidos los casos 5x5) y
+# tests/test_solve.py / test_evaluate.py para /inequality de 1 variable.
+# Estos 2 tests quedaban afirmando el comportamiento viejo (stub) y
+# fallaban contra el código real; se actualizan para reflejar el
+# comportamiento actual en vez de eliminarse, para no perder la
+# verificación de que "eval(1)=0" (una inyección obvia) se rechaza con
+# PARSE_ERROR y no se ejecuta como código.
+def test_solve_system_rejects_unsafe_input():
     response = client.post(
         "/api/v1/solve/system",
         json={"equations": ["x+y=1", "eval(1)=0"], "variables": ["x", "y"]},
     )
     body = response.json()
     assert body["success"] is False
-    assert body["error_code"] == "UNSUPPORTED_IN_PHASE_1"
-    # La ecuación contiene una inyección obvia ("eval(1)=0") — si el stub
-    # ejecutara lógica de SymPy/parsing real, esto fallaría con PARSE_ERROR
-    # en vez de UNSUPPORTED_IN_PHASE_1. Que devuelva UNSUPPORTED_IN_PHASE_1
-    # confirma que nunca se intentó parsear el contenido.
+    assert body["error_code"] == "PARSE_ERROR"
     assert body["operation"] == "solve_system"
 
 
-def test_inequality_is_unsupported_stub():
+def test_inequality_is_real_passthrough():
     response = client.post("/api/v1/inequality", json={"inequality": "x>2"})
     body = response.json()
-    assert body["success"] is False
-    assert body["error_code"] == "UNSUPPORTED_IN_PHASE_1"
+    assert body["success"] is True
+    assert "2" in body["result_text"]
 
 
 def test_integral_improper_is_unsupported_stub():

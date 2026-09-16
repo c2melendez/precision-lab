@@ -236,12 +236,19 @@ class GraphResult:
 
 def _apply_degree_conversion(expr: sympy.Expr) -> sympy.Expr:
     """Igual que en `evaluate_service`/`solve_service`: grados -> radianes
-    solo dentro de argumentos de funciones trig DIRECTAS."""
+    solo dentro de argumentos de funciones trig DIRECTAS.
+
+    Corrección del pendiente #7 (equivalente Full del bug de doble
+    conversión ya corregido en Lite, pendiente #6): si el argumento YA
+    contiene π (lo que deja la conversión de la tecla ° en el frontend)
+    no se vuelve a multiplicar por π/180 — ya está en radianes."""
 
     def _is_direct_trig(node: sympy.Basic) -> bool:
         return isinstance(node, _DIRECT_TRIG_FUNCTIONS)
 
     def _convert(node: sympy.Basic) -> sympy.Basic:
+        if node.args[0].has(pi):
+            return node
         return node.func(node.args[0] * pi / 180)
 
     return expr.replace(_is_direct_trig, _convert)

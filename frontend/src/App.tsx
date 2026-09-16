@@ -24,7 +24,8 @@ import { MatrixMode } from "./components/MatrixMode";
 import { StatisticsMode } from "./components/StatisticsMode";
 import { SystemMode } from "./components/SystemMode";
 import { UnitsMode } from "./components/UnitsMode";
-import { ThemeToggle } from "./components/ThemeToggle";
+import { AjustesPopover } from "./components/AjustesPopover";
+import { KeyboardDock } from "./components/KeyboardDock";
 import { useUIStore, type CalculatorMode } from "./store/useUIStore";
 
 const MODE_LABELS: Record<CalculatorMode, string> = {
@@ -54,9 +55,15 @@ const MODE_LABELS: Record<CalculatorMode, string> = {
 //
 // P6 (spec v2 §7): "statistics" nueva, visible.
 // P7 (spec v2 §8): "units" nueva, visible — con esto queda el orden
-// final de §9: Científica · Basic · Matrices · Gráficas · Estadística ·
-// Unidades.
-const VISIBLE_MODES: CalculatorMode[] = ["basic", "simple", "matrix", "graph", "statistics", "units"];
+// final de §9 (previo al Módulo 5): Científica · Basic · Matrices ·
+// Gráficas · Estadística · Unidades.
+//
+// Módulo 5 (hoja-de-ruta-visual.md §5 / spec §3): mismo tratamiento para
+// "simple" (Basic) — confirmado por el usuario. Verificado: a diferencia
+// de precision-lab-lite, SimpleKeyboard.tsx (Full) no tiene ninguna
+// función propia sin equivalente (solo dígitos/paréntesis/AC/⌫/⏎, todo
+// cubierto por BasicMode) — acá la eliminación no deja nada huérfano.
+const VISIBLE_MODES: CalculatorMode[] = ["basic", "matrix", "graph", "statistics", "units"];
 
 function ActiveModeForm({ mode }: { mode: CalculatorMode }) {
   switch (mode) {
@@ -115,7 +122,7 @@ export default function App() {
             >
               Historial
             </button>
-            <ThemeToggle />
+            <AjustesPopover />
           </div>
         </div>
       </header>
@@ -142,7 +149,11 @@ export default function App() {
       </nav>
 
       <div className="flex">
-        <main id="main-content" className="mx-auto min-w-0 max-w-3xl flex-1 px-6 py-8 lg:max-w-5xl dt:max-w-[1440px] dt:px-10">
+        {/* Módulo 0: padding inferior para que el KeyboardDock fijo no
+            tape el contenido de ningún modo — cambio de layout global,
+            deliberado, ver Cierre del Módulo 0 (mismo criterio que en
+            precision-lab-lite/src/App.tsx). */}
+        <main id="main-content" className="mx-auto min-w-0 max-w-3xl flex-1 px-6 py-8 pb-56 lg:max-w-5xl dt:max-w-[1440px] dt:px-10 dt:pb-40">
           {lastErrorMessage && (
             <p role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {lastErrorMessage}
@@ -161,6 +172,7 @@ export default function App() {
           </ErrorBoundary>
         </HistoryDrawer>
       </div>
+      <KeyboardDock />
     </div>
   );
 }

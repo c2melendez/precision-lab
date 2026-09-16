@@ -23,13 +23,14 @@ from app.schemas.requests import (
     ImplicitDerivativeRequest,
     ImproperIntegralRequest,
     InequalityRequest,
+    InequalitySystemRequest,
     LimitRequest,
     PartialDerivativeRequest,
     SeriesRequest,
     SolveSystemRequest,
 )
 from app.schemas.responses import ErrorCode, MathResponse, OperationType, ResultType
-from app.services import graph_service, parsing, phase2_service
+from app.services import graph_service, linear_inequality_system, parsing, phase2_service
 from app.services.ast_validator import ComplexityLimitError
 
 router = APIRouter(tags=["phase2"])
@@ -204,6 +205,50 @@ async def inequality(payload: InequalityRequest, request: Request) -> MathRespon
         result_latex=sympy.latex(result.solution_set),
         has_detailed_steps=False,
         warnings=result.warnings,
+        duration_ms=_duration_ms(request),
+    )
+
+
+@router.post("/inequality/system", response_model=MathResponse)
+async def inequality_system(payload: InequalitySystemRequest, request: Request) -> MathResponse:
+    """Pendiente #5 (revisión post-Módulo D, pedido por el usuario):
+    sistema de inecuaciones lineales — equivalente Full/SymPy del ya
+    construido en Lite (linearInequalitySystem.ts). Cada inecuación se
+    parsea con la misma infraestructura de seguridad que `/inequality`
+    (parse_inequality_tree, etapas 1-9); la validación de linealidad y de
+    cantidad exacta de variables vive en linear_inequality_system.py."""
+    log_request_event(request.state.request_id, "inequality_system_request")
+
+    parsed_constraints = []
+    for text in payload.inequalities:
+        try:
+            rel = parsing.parse_inequality_tree(text)
+        except parsing.ParseSecurityError as exc:
+            return _error(request, OperationType.INEQUALITY_SYSTEM, ErrorCode.PARSE_ERROR, str(exc))
+        except ComplexityLimitError as exc:
+            return _error(request, OperationType.INEQUALITY_SYSTEM, ErrorCode.COMPLEXITY_LIMIT, str(exc))
+        parsed_constraints.append((rel.lhs - rel.rhs, rel.rel_op))
+
+    try:
+        result = linear_inequality_system.solve_linear_inequality_system(
+            parsed_constraints, payload.variables
+        )
+    except ValueError as exc:
+        return _error(request, OperationType.INEQUALITY_SYSTEM, ErrorCode.VALIDATION_ERROR, str(exc))
+
+    vertices_data = (
+        [[str(p.x), str(p.y)] for p in result.vertices] if result.vertices is not None else None
+    )
+
+    return MathResponse(
+        success=True,
+        operation=OperationType.INEQUALITY_SYSTEM,
+        request_id=request.state.request_id,
+        result_type=ResultType.INEQUALITY_REGION,
+        result_text=result.kind,
+        result_data=vertices_data,
+        has_detailed_steps=False,
+        warnings=result.steps,
         duration_ms=_duration_ms(request),
     )
 

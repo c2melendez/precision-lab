@@ -82,12 +82,19 @@ def _validate_and_parse_substitutions(
 def _apply_degree_conversion(expr: sympy.Expr) -> sympy.Expr:
     """Convierte grados -> radianes SOLO dentro de argumentos de funciones
     trig directas (sección 3: "alcance limitado a funciones trig directas").
+
+    Corrección del pendiente #7 (equivalente Full del pendiente #6 de
+    Lite): si el argumento YA contiene π no se vuelve a multiplicar por
+    π/180 — evita la doble conversión cuando el usuario usa la tecla °
+    con angle_unit="deg" activo al mismo tiempo.
     """
 
     def _is_direct_trig(node: sympy.Basic) -> bool:
         return isinstance(node, _DIRECT_TRIG_FUNCTIONS)
 
     def _convert(node: sympy.Basic) -> sympy.Basic:
+        if node.args[0].has(pi):
+            return node
         return node.func(node.args[0] * pi / 180)
 
     return expr.replace(_is_direct_trig, _convert)

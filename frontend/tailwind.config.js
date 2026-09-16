@@ -1,7 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 // Precision Lab — tokens de diseño compartidos con Precision Lab (Python).
 // Los colores leen variables CSS (definidas en design-tokens.css) en vez de
-// hex fijos, para soportar los 3 temas ([data-theme]: dark/light/high-contrast)
+// hex fijos, para soportar todos los temas ([data-theme]: uno por bloque en
+// design-tokens.css, hoy 13 en total tras la corrección post-auditoría que
+// completó los 9 que quedaban pendientes del log de decisiones §7)
 // sin duplicar componentes. Cambios aquí deben reflejarse también en el
 // tailwind.config.js del proyecto Python para mantener paridad visual.
 import defaultTheme from "tailwindcss/defaultTheme";

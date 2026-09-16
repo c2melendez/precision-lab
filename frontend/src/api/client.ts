@@ -47,6 +47,13 @@ const ENDPOINT_TO_OPERATION: Record<KnownEndpoint, OperationType | null> = {
   "/graph/2d": "graph_2d",
   "/solve/system": "solve_system",
   "/inequality": "inequality",
+  // Módulo C (spec_motor_matematico_pendiente.md §4) — faltaba esta
+  // entrada, hallazgo de auditoría: el endpoint ya estaba en
+  // KNOWN_ENDPOINTS/KnownEndpoint (endpoints.ts) pero no aquí, rompiendo
+  // el typecheck del proyecto (Record<KnownEndpoint, ...> exige las 2
+  // en sincronía). Mismo nombre que ResponseOperationType.INEQUALITY_SYSTEM
+  // en el backend (app/schemas/responses.py).
+  "/inequality/system": "inequality_system",
   "/limit": "limit",
   "/series": "series",
   "/matrix/eigen": "matrix_eigen",

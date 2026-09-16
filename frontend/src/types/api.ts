@@ -396,6 +396,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inequality/system": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Inequality System
+         * @description Pendiente #5 (revisión post-Módulo D, pedido por el usuario):
+         *     sistema de inecuaciones lineales — equivalente Full/SymPy del ya
+         *     construido en Lite (linearInequalitySystem.ts). Cada inecuación se
+         *     parsea con la misma infraestructura de seguridad que `/inequality`
+         *     (parse_inequality_tree, etapas 1-9); la validación de linealidad y de
+         *     cantidad exacta de variables vive en linear_inequality_system.py.
+         */
+        post: operations["inequality_system_api_v1_inequality_system_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integral/improper": {
         parameters: {
             query?: never;
@@ -804,6 +829,20 @@ export interface components {
             /** Variable */
             variable?: string | null;
         };
+        /**
+         * InequalitySystemRequest
+         * @description Pendiente #5 (revisión de pendientes del track de teclado/motor,
+         *     pedido por el usuario): sistema de inecuaciones lineales — equivalente
+         *     Full/SymPy de linearInequalitySystem.ts (Lite). Alcance confirmado:
+         *     exactamente 2 variables (la validación de cantidad exacta vive en el
+         *     servicio, no acá, para dar un mensaje más claro que un 422 genérico).
+         */
+        InequalitySystemRequest: {
+            /** Inequalities */
+            inequalities: string[];
+            /** Variables */
+            variables: string[];
+        };
         /** IntegralRequest */
         IntegralRequest: {
             /** Expression */
@@ -945,7 +984,7 @@ export interface components {
          * OperationType
          * @enum {string}
          */
-        OperationType: "evaluate" | "simplify" | "factor" | "expand" | "solve" | "derivative" | "integral" | "matrix_operation" | "matrix_determinant" | "matrix_inverse" | "graph_2d" | "solve_system" | "inequality" | "limit" | "series" | "matrix_eigen" | "integral_improper" | "graph_3d" | "graph_parametric" | "derivative_partial" | "derivative_implicit" | "matrix_transpose" | "matrix_power" | "matrix_ref" | "matrix_rref" | "matrix_norm" | "statistics_descriptive" | "statistics_combinatorics" | "statistics_binomial" | "statistics_normal";
+        OperationType: "evaluate" | "simplify" | "factor" | "expand" | "solve" | "derivative" | "integral" | "matrix_operation" | "matrix_determinant" | "matrix_inverse" | "graph_2d" | "solve_system" | "inequality" | "limit" | "series" | "matrix_eigen" | "integral_improper" | "graph_3d" | "graph_parametric" | "derivative_partial" | "derivative_implicit" | "matrix_transpose" | "matrix_power" | "matrix_ref" | "matrix_rref" | "matrix_norm" | "statistics_descriptive" | "statistics_combinatorics" | "statistics_binomial" | "statistics_normal" | "inequality_system";
         /** PartialDerivativeRequest */
         PartialDerivativeRequest: {
             /** Expression */
@@ -962,7 +1001,7 @@ export interface components {
          * ResultType
          * @enum {string}
          */
-        ResultType: "scalar" | "equation_solutions" | "matrix" | "boolean" | "graph" | "identity" | "contradiction";
+        ResultType: "scalar" | "equation_solutions" | "matrix" | "boolean" | "graph" | "identity" | "contradiction" | "inequality_region";
         /** SeriesRequest */
         SeriesRequest: {
             /** Expression */
@@ -1761,6 +1800,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["InequalityRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inequality_system_api_v1_inequality_system_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InequalitySystemRequest"];
             };
         };
         responses: {

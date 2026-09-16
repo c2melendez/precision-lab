@@ -104,6 +104,17 @@ class InequalityRequest(BaseModel):
     variable: Optional[str] = None
 
 
+class InequalitySystemRequest(BaseModel):
+    """Pendiente #5 (revisión de pendientes del track de teclado/motor,
+    pedido por el usuario): sistema de inecuaciones lineales — equivalente
+    Full/SymPy de linearInequalitySystem.ts (Lite). Alcance confirmado:
+    exactamente 2 variables (la validación de cantidad exacta vive en el
+    servicio, no acá, para dar un mensaje más claro que un 422 genérico)."""
+
+    inequalities: List[str] = Field(..., min_length=1, max_length=10)
+    variables: List[str] = Field(..., min_length=1, max_length=5)
+
+
 class LimitRequest(BaseModel):
     expression: str = Field(..., min_length=1, max_length=500)
     variable: str = "x"

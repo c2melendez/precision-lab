@@ -33,6 +33,18 @@ vi.mock("../components/NaturalMathField", () => ({
 
 import { callApi } from "../api/client";
 import { useUIStore } from "../store/useUIStore";
+import { useKeyboardPanelStore } from "../store/useKeyboardPanelStore";
+
+// Corrección post-auditoría: desde el rediseño del teclado
+// (spec_teclado_virtual.md), BasicMode ya no renderiza <NaturalMathKeyboard>
+// inline — solo registra su contenido en useKeyboardPanelStore, que
+// <KeyboardDock>/<KeyboardPanel> (montados en App.tsx, fuera de este test)
+// leen y renderizan. Este test necesitaba el contenido del teclado en el
+// DOM, así que se agrega un pequeño harness que simula ese consumidor.
+function KeyboardStoreSubscriber() {
+  const content = useKeyboardPanelStore((s) => s.content);
+  return <>{content}</>;
+}
 
 const mockedCallApi = vi.mocked(callApi);
 
@@ -150,6 +162,56 @@ describe("BasicMode", () => {
     expect(mockedCallApi).not.toHaveBeenCalled();
   });
 
+  // Corrección post-auditoría (Módulo C, spec_motor_matematico_pendiente.md
+  // §4): antes CUALQUIER fila sin "=" hacía fallar el sistema entero con
+  // "Cada ecuación del sistema debe incluir un signo =" — el endpoint
+  // /inequality/system nunca se llamaba desde ningún flujo real pese a
+  // existir y funcionar en el backend.
+  it("enruta a /inequality/system cuando todas las filas del sistema son inecuaciones", async () => {
+    render(<BasicMode />);
+    // Variables del sistema por defecto es "x, y" (2), que ya coincide
+    // con el alcance fijo de 2 variables del solver de inecuaciones —
+    // no hace falta tocar ese campo.
+    fireEvent.change(screen.getByLabelText("Expresión"), {
+      target: { value: "\\begin{cases}x+y<=4\\\\x-y>=0\\end{cases}" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: "Evaluar" }).closest("form")!);
+
+    await waitFor(() => expect(mockedCallApi).toHaveBeenCalled());
+
+    expect(mockedCallApi).toHaveBeenCalledWith("/inequality/system", {
+      inequalities: ["x+y<=4", "x-y>=0"],
+      variables: ["x", "y"],
+    });
+  });
+
+  it("rechaza un sistema de inecuaciones sin exactamente 2 variables, sin llamar a la API", async () => {
+    render(<BasicMode />);
+    fireEvent.change(screen.getByLabelText("Expresión"), {
+      target: { value: "\\begin{cases}x<=4\\\\x>=0\\end{cases}" },
+    });
+    fireEvent.change(screen.getByLabelText(/Variables del sistema/), { target: { value: "x" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Evaluar" }).closest("form")!);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Un sistema de inecuaciones lineales requiere exactamente 2 variables",
+    );
+    expect(mockedCallApi).not.toHaveBeenCalled();
+  });
+
+  it("rechaza un sistema que mezcla ecuaciones e inecuaciones, sin llamar a la API", async () => {
+    render(<BasicMode />);
+    fireEvent.change(screen.getByLabelText("Expresión"), {
+      target: { value: "\\begin{cases}x+y=4\\\\x-y>=0\\end{cases}" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: "Evaluar" }).closest("form")!);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "no se puede mezclar ambos tipos en el mismo sistema",
+    );
+    expect(mockedCallApi).not.toHaveBeenCalled();
+  });
+
   // Fase 2: handleSubmit gana detección de derivada/integral en notación
   // natural — ver calculusIntent.ts para la explicación completa de por
   // qué esto toca (sin reabrir) la decisión de seguridad "Fase 0 v2".
@@ -233,9 +295,17 @@ describe("BasicMode", () => {
   // ahora solo inserta la plantilla LaTeX, como cualquier otra tecla de
   // la tira de Cálculo.
   it('la tecla "derivada" del teclado inserta la plantilla LaTeX (Fase 2 la resuelve inline, ya no navega)', () => {
-    render(<BasicMode />);
+    render(
+      <>
+        <BasicMode />
+        <KeyboardStoreSubscriber />
+      </>,
+    );
 
     expect(useUIStore.getState().activeMode).toBe("basic");
+    // La tecla vive dentro de la categoría colapsable "Cálculo" (rediseño
+    // de teclado) — hay que abrirla antes de que "derivada" esté en el DOM.
+    fireEvent.click(screen.getByRole("button", { name: "Cálculo" }));
     fireEvent.click(screen.getByLabelText("derivada"));
     expect(useUIStore.getState().activeMode).toBe("basic");
   });

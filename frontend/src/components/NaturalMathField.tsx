@@ -101,10 +101,77 @@ function collapseKnownFunctionNames(ascii: string): string {
   return result;
 }
 
+/**
+ * Pendiente #7 (revisión post-Módulo D, pedido por el usuario) —
+ * equivalente Full de la notación de grados que Lite ya tiene en
+ * normalize.ts. Mismo orden de reglas (DMS compuesto primero, simple
+ * después) y misma decisión DEDUCIBLE: ° convierte SIEMPRE a radianes
+ * (×π/180), sin consultar angle_unit — el símbolo ° es universal,
+ * independiente del modo activo. Opera sobre el ASCII ya convertido por
+ * `convertLatexToAsciiMath` (° es un glyph plano, no un macro LaTeX,
+ * sobrevive esa conversión sin cambios — mismo criterio que sinh/cosh
+ * ya confirmado en este archivo).
+ *
+ * NIVEL DE EVIDENCIA para esta función específica: 2, no 1 — no hay
+ * `mathlive` real instalado en este entorno para confirmar con
+ * ejecución qué ASCII exacto produce `convertLatexToAsciiMath` para un
+ * "°" suelto. El regex asume que sobrevive como carácter literal, mismo
+ * supuesto ya aceptado para sinh/cosh/csch/etc. en este mismo archivo.
+ */
+function applyDegreeNotation(ascii: string): string {
+  let result = ascii;
+  result = result.replace(/(-?\d+(?:\.\d+)?)°(\d+(?:\.\d+)?)′(\d+(?:\.\d+)?)″/g, "($1+$2/60+$3/3600)°");
+  result = result.replace(/(-?\d+(?:\.\d+)?)°(\d+(?:\.\d+)?)′/g, "($1+$2/60)°");
+  result = result.replace(/\(([^()]*)\)°/g, "(($1)*pi/180)");
+  result = result.replace(/(-?\d+(?:\.\d+)?)°/g, "(($1)*pi/180)");
+  return result;
+}
+
+/**
+ * Pendiente #8 (revisión de pendientes, intento de verificación pedido
+ * por el usuario): activé sinh⁻¹/cosh⁻¹/tanh⁻¹/csch⁻¹/sech⁻¹/coth⁻¹ (spec
+ * teclado §5.1, Módulo A del motor) asumiendo que `convertLatexToAsciiMath`
+ * resuelve "sinh^{-1}" solo, igual que ya hace para la sección "Inversas"
+ * preexistente (sin⁻¹ etc.) — nunca pude confirmarlo con ejecución real:
+ * intenté instalar `mathlive` desde el registro real y desde dos CDNs
+ * (unpkg, jsdelivr) y los tres están bloqueados por la política de red
+ * de este entorno (`host_not_allowed`, verificado con curl).
+ *
+ * En vez de dejarlo como una suposición sin verificar, esta función
+ * ELIMINA la dependencia de esa suposición: convierte "sinhᐩexponente-1"
+ * a "asinh" (etc.) de forma explícita, cubriendo las formas de ASCII más
+ * probables que `convertLatexToAsciiMath` podría producir para "^{-1}"
+ * (con `^` o `**`, con o sin paréntesis alrededor del -1) — así el
+ * resultado es determinista sin importar cuál de esas formas use
+ * realmente la librería. Sigue siendo nivel de evidencia 2 (no hay
+ * ejecución real que lo confirme), pero ya no depende de una conducta
+ * no verificada de un tercero.
+ */
+const HYPERBOLIC_INVERSE_NAMES: Record<string, string> = {
+  sinh: "asinh",
+  cosh: "acosh",
+  tanh: "atanh",
+  csch: "acsch",
+  sech: "asech",
+  coth: "acoth",
+};
+
+function rewriteHyperbolicInverses(ascii: string): string {
+  let result = ascii;
+  for (const [name, inverse] of Object.entries(HYPERBOLIC_INVERSE_NAMES)) {
+    const pattern = new RegExp(`\\b${name}\\s*(?:\\^|\\*\\*)\\s*\\(?-1\\)?`, "g");
+    result = result.replace(pattern, inverse);
+  }
+  return result;
+}
+
 export function latexToBackendSyntax(latex: string): string {
   if (latex.trim() === "") return "";
   const ascii = convertLatexToAsciiMath(latex);
-  return collapseKnownFunctionNames(rewriteNthRoot(ascii)).trim();
+
+  return applyDegreeNotation(
+    rewriteHyperbolicInverses(collapseKnownFunctionNames(rewriteNthRoot(ascii))),
+  ).trim();
 }
 
 interface NaturalMathFieldProps {

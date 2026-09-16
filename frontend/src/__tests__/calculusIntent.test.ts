@@ -77,6 +77,7 @@ describe("detectCalculusIntent (Fase 2 — fusión de modos, proyecto con backen
         variable: "x",
         point: "2",
         innerLatex: "\\frac{x^2-4}{x-2}",
+        direction: "both",
       });
     });
 
@@ -86,6 +87,7 @@ describe("detectCalculusIntent (Fase 2 — fusión de modos, proyecto con backen
         variable: "x",
         point: "oo",
         innerLatex: "\\frac{1}{x}",
+        direction: "both",
       });
     });
 
@@ -95,6 +97,7 @@ describe("detectCalculusIntent (Fase 2 — fusión de modos, proyecto con backen
         variable: "x",
         point: "-oo",
         innerLatex: "\\frac{1}{x}",
+        direction: "both",
       });
     });
 
@@ -104,8 +107,34 @@ describe("detectCalculusIntent (Fase 2 — fusión de modos, proyecto con backen
     // utilizable. Se verifica que NO se detecte como límite en vez de
     // fabricar un resultado con datos rotos — cae al flujo normal
     // (probablemente /evaluate, que fallará con un error claro).
-    it("NO detecta límite lateral derecho (notación rota en esta versión del motor)", () => {
+    it("NO detecta límite lateral escrito a mano sin llaves en el exponente (notación rota en Compute Engine 0.58.0 para esta forma)", () => {
       expect(detectCalculusIntent("\\lim_{x\\to 0^+} \\frac{1}{x}")).toBeNull();
+    });
+
+    // Corrección post-auditoría (hallazgo de paridad Lite/Full): la tecla
+    // "lim x→a±" del teclado SIEMPRE inserta el signo entre llaves
+    // (\lim_{#0\to#1^{#2}}#3, ver NaturalMathKeyboard.tsx) — esa forma
+    // exacta ya no depende de Compute Engine, la reconoce
+    // detectLateralLimit() con su propio escáner (mismo criterio que
+    // detectDerivative arriba).
+    it("detecta límite lateral derecho con el signo entre llaves (forma exacta que inserta el teclado)", () => {
+      expect(detectCalculusIntent("\\lim_{x\\to0^{+}}\\frac{1}{x}")).toEqual({
+        kind: "limit",
+        variable: "x",
+        point: "0",
+        innerLatex: "\\frac{1}{x}",
+        direction: "right",
+      });
+    });
+
+    it("detecta límite lateral izquierdo con el signo entre llaves", () => {
+      expect(detectCalculusIntent("\\lim_{x\\to0^{-}}\\frac{1}{x}")).toEqual({
+        kind: "limit",
+        variable: "x",
+        point: "0",
+        innerLatex: "\\frac{1}{x}",
+        direction: "left",
+      });
     });
 
     it("NO detecta límite lateral izquierdo (notación rota en esta versión del motor)", () => {

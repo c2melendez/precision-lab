@@ -531,10 +531,17 @@ export function NaturalMathKeyboard({
                         setOpenCategory(null);
                         setShowSystemSizeMenu(true);
                       }}
-                      aria-label="Sistema de inecuaciones — escribe inecuaciones dentro de las llaves"
-                      className="rounded-md bg-alpha-soft py-2 text-[10px] text-alpha hover:bg-alpha-soft/80"
+                      aria-label="Sistema de inecuaciones de 2 variables — escribe inecuaciones dentro de las llaves"
+                      className="relative rounded-md bg-alpha-soft py-2 text-[10px] text-alpha hover:bg-alpha-soft/80"
                     >
                       Sist. inecuaciones
+                      {/* Módulo de cierre (honestidad de alcance): el motor
+                          (linear_inequality_system.py) solo resuelve EXACTAMENTE
+                          2 variables — este botón es funcional (no unavailable),
+                          pero no comunicaba esa limitación real antes de tocarlo. */}
+                      <span className="absolute -bottom-1 right-1 rounded-sm bg-alpha/20 px-1 text-[7px] font-medium leading-tight text-alpha">
+                        2 var.
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -575,7 +582,16 @@ export function NaturalMathKeyboard({
                         type="button"
                         onClick={() => press(k)}
                         aria-label={k.ariaLabel}
-                        className="rounded-md bg-marker-soft/10 py-2 text-sm text-marker hover:bg-marker-soft/20"
+                        className={
+                          // Módulo de cierre (honestidad visual): mismo patrón
+                          // gris/borde punteado que ya usa KeyboardBasicPanel.tsx
+                          // (este mismo repo) para "°" — antes esta tecla se
+                          // veía idéntica a una activa aunque k.unavailable
+                          // fuera true.
+                          k.unavailable
+                            ? "rounded-md border border-dashed border-bone/30 bg-chrome-soft/40 py-2 text-sm text-bone/40"
+                            : "rounded-md bg-marker-soft/10 py-2 text-sm text-marker hover:bg-marker-soft/20"
+                        }
                       >
                         <KeyGlyph glyph={k.glyph} />
                       </button>

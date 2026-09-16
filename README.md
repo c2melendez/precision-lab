@@ -28,6 +28,15 @@ Motor: SymPy, backend FastAPI (`backend/app/services/`). Auditado contra `spec_m
 
 **Estado verificado al cierre de esta auditoría:** backend `pytest` 189/194 (5 fallas preexistentes, fuera de alcance — `integral/improper`, `graph/3d`, `graph/parametric`, `derivative/partial`, `derivative/implicit`, todavía sin implementar); frontend `tsc --noEmit` limpio, `npx vitest run` 150/150, `npm run build` limpio (mismo warning preexistente de tamaño de chunk).
 
+## Módulo de cierre — honestidad visual de teclas no disponibles y de alcance limitado
+
+Cierre pequeño, deliberadamente acotado, previo a correr las tandas de EDO/variable compleja/reordenamiento/tooltips, rediseño visual y graficación/matrices/estadística/unidades. No adelanta ninguna fase de esas specs. Mismo cambio aplicado en paralelo a `precision-lab-lite` (paridad verificada con capturas de Chromium real en ambos repos).
+
+- **Teclas `unavailable` en el panel de categorías** (`NaturalMathKeyboard.tsx`, renderizador genérico de `CATEGORY_MENUS`): antes se veían idénticas a una tecla activa — la única señal de que no funcionan (`Π`, `∂/∂x`) era un aviso emergente después de tocarlas. Ahora usan el mismo patrón gris/borde punteado que ya usaba `KeyboardBasicPanel.tsx` para `°` antes del Módulo D (`border-dashed border-bone/30 bg-chrome-soft/40 text-bone/40`).
+- **"Sist. inecuaciones" (2 variables):** el botón es funcional (no `unavailable`) pero no comunicaba que el motor solo resuelve exactamente 2 variables (`linear_inequality_system.py`). Se agregó una etiqueta "2 var." en el propio botón y se amplió el texto del `aria-label` para que la limitación también llegue a lectores de pantalla — sin tocar `KeyDef` ni agregar campos nuevos, dejando esa decisión para `spec_edo_complejos_tooltips.md` Fase H.
+- `CATEGORIES_BASIC_MODE`/`CATEGORIES_FULL` verificados sin cambios (Fase G de `spec_edo_complejos_tooltips.md` parte de ese estado exacto para su propio reordenamiento).
+- Verificado: `tsc --noEmit` limpio, `npx vitest run` 150/150, `npm run build` limpio, capturas reales con Chromium (mobile) confirmando el resultado visual.
+
 ## Correcciones post-entrega
 
 Aplicadas sobre el paquete final tras una auditoría de conformidad contra la

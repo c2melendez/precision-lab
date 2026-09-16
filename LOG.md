@@ -120,3 +120,23 @@ limpio (mismo warning preexistente de tamaño de chunk, no es error).
 - Las 5 fallas preexistentes de `test_phase2.py` (features todavía sin
   implementar) siguen ahí — no se tocaron, están fuera del alcance de
   esta auditoría (Módulos A-D del motor matemático).
+
+## Módulo de cierre — honestidad visual (previo a EDO/complejos/tooltips, rediseño visual, graficación/matrices/estadística/unidades)
+
+Módulo pequeño, propuesto por otra sesión de IA y auditado contra el código real antes de ejecutarlo. Objetivo: dejar el código consistente con lo que las tres tandas de prompts nuevas ya asumen como cierto, sin adelantar ninguna fase de ellas. Mismo trabajo hecho en paralelo en `precision-lab-lite`.
+
+Verificado antes de tocar nada: el renderizador genérico de `CATEGORY_MENUS` (bloque que mapea `group.keys`) no tenía ningún condicional sobre `k.unavailable` — confirmado leyendo el JSX real. El límite real de 2 variables en `linear_inequality_system.py` también se confirmó leyendo el código (mensaje de rechazo explícito ya existente), no se asumió del spec.
+
+Tarea 1 — estilo visual para `k.unavailable`: agregado el condicional en `NaturalMathKeyboard.tsx`, reutilizando el patrón exacto que ya usaba `KeyboardBasicPanel.tsx` para `°` antes del Módulo D (gris, borde punteado). Sin estilo nuevo.
+
+Tarea 2 — honestidad de alcance en "Sist. inecuaciones": etiqueta "2 var." dentro del botón + texto del `aria-label` ampliado. No se tocó el campo `ariaLabel` de `KeyDef` ni se agregó `description` — eso se dejó explícitamente para la Fase H de `spec_edo_complejos_tooltips.md`, todavía sin confirmar (sección 5.2).
+
+Tarea 3 — corrección de documentación: nota agregada en `spec_motor_matematico_pendiente.md` (secciones 4 y 8) y en `precision-lab-rediseno-teclado-log.md` (sección 6) aclarando que el motor de inecuaciones ya existe y su alcance real es 2 variables — esos documentos viven fuera de este repo (los mantiene Carlos aparte), así que no se subieron aquí, se entregaron actualizados directamente.
+
+Verificación explícita pedida por el propio módulo: `CATEGORIES_BASIC_MODE` y `CATEGORIES_FULL` quedaron byte-idénticos al estado anterior — necesario porque `spec_edo_complejos_tooltips.md` Fase G reordena ese mismo array partiendo de su estado actual.
+
+Paridad `precision-lab-lite` confirmada — mismo cambio, mismo texto de aria-label, misma clase condicional, mismo resultado visual capturado con Chromium en ambos repos (mobile, 390×844).
+
+Nivel de evidencia: NIVEL 1 (ejecución real). `tsc --noEmit` limpio, `npx vitest run` 150/150 (sin tests nuevos — este módulo es solo JSX/estilo, no motor), `npm run build` limpio (mismo warning preexistente de tamaño de chunk). Backend no se tocó (las 3 tareas son solo frontend + documentación externa).
+
+Decisión DEDUCIBLE tomada: el texto exacto de la etiqueta ("2 var.") y su posición (esquina inferior derecha del botón, `absolute -bottom-1 right-1`) se decidieron sin pedir confirmación previa por ser un detalle menor de layout — reversible con un cambio de una línea si Carlos prefiere otra redacción o posición. Verificado visualmente que no se corta ni se superpone con botones vecinos.

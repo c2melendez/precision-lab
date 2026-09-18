@@ -3,6 +3,21 @@
  * Mismo lenguaje visual que Precision Lab Lite (ficha tipo "margen de
  * cuaderno"), aprovechando aquí el modelo de datos completo (title, rule,
  * latex_before/after) que expone el backend SymPy. Ver auditoría Fase 0.
+ *
+ * Fase BB, Módulo BB0 (spec_rediseno_visual.md sección 14) — decisión
+ * DEDUCIBLE registrada: `step.rule` (identificador técnico en inglés/
+ * PascalCase, ej. "PowerRule", "ChainRule") dejó de renderizarse como
+ * insignia junto al título. Se optó por la opción (b) del spec —dejar de
+ * mostrarlo— y no (a) traducirlo ni (c) fusionarlo en `description`,
+ * porque `title`/`description` ya están en español natural y cubren el
+ * mismo propósito sin necesitar mantener un diccionario de traducción
+ * para cada identificador que puedan emitir los distintos motores
+ * (derivada, integral, límite, sistemas, EDO). El campo `rule` se
+ * mantiene en el contrato de datos (`Step.rule`, sin cambios de tipo) por
+ * si algún consumidor futuro lo necesita — solo se retiró su
+ * visualización aquí, único punto donde se renderizaba (auditoría
+ * confirmada: `grep` de `step.rule`/`.rule` en todo `src/` antes de este
+ * cambio no encontró otro sitio).
  */
 
 import type { components } from "../types/api";
@@ -39,11 +54,6 @@ export function StepList({ steps, activeIndex }: StepListProps) {
                 <span className={isActive ? "text-sm font-medium text-marker-text" : "text-sm font-medium text-muted"}>
                   {step.title}
                 </span>
-                {step.rule && (
-                  <span className="rounded bg-paper-soft px-2 py-0.5 font-mono text-xs text-muted">
-                    {step.rule}
-                  </span>
-                )}
               </div>
               <p className="mt-1 text-sm text-muted">{step.description}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">

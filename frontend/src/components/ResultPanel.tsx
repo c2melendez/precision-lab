@@ -114,7 +114,7 @@ function SolutionListResult({ solutions }: { solutions: EquationSolution[] }) {
   return (
     <ul className="space-y-2">
       {solutions.map((solution, index) => (
-        <li key={index} className="text-lg text-ink">
+        <li key={index} className="a11y-scale-result-lg text-ink">
           <MathRenderer latex={solution.latex} fallbackText={solution.text} />
           {solution.is_complex && <span className="ml-2 text-xs text-muted">(compleja)</span>}
         </li>
@@ -174,7 +174,7 @@ export function ResultPanel({ result, isLoading }: ResultPanelProps) {
           {(() => {
             if (format === "dec") {
               return approxText ? (
-                <p className="text-lg text-ink">{approxText}</p>
+                <p className="a11y-scale-result-lg text-ink">{approxText}</p>
               ) : (
                 <p className="text-sm text-muted">No hay aproximación decimal disponible.</p>
               );
@@ -182,7 +182,7 @@ export function ResultPanel({ result, isLoading }: ResultPanelProps) {
             if (format === "scn") {
               const n = result.result_approx != null ? Number(result.result_approx) : NaN;
               return Number.isFinite(n) ? (
-                <p className="text-lg text-ink">{n.toExponential(6)}</p>
+                <p className="a11y-scale-result-lg text-ink">{n.toExponential(6)}</p>
               ) : (
                 <p className="text-sm text-muted">No hay un valor numérico para notación científica.</p>
               );
@@ -196,18 +196,23 @@ export function ResultPanel({ result, isLoading }: ResultPanelProps) {
               }
               const displayLatex = mixedLatex && showMixed ? mixedLatex : result.result_latex!;
               return (
-                <MathRenderer latex={displayLatex} fallbackText={result.result_text ?? undefined} className="text-lg" />
+                <MathRenderer
+                  latex={displayLatex}
+                  fallbackText={result.result_text ?? undefined}
+                  className="a11y-scale-result-lg"
+                />
               );
             }
-            // "exact": comportamiento original, sin cambios.
+            // "exact": comportamiento original, sin cambios (salvo
+            // Módulo R0: a11y-scale-result-lg reemplaza a text-lg).
             return result.result_latex ? (
               <MathRenderer
                 latex={result.result_latex}
                 fallbackText={result.result_text ?? undefined}
-                className="text-lg"
+                className="a11y-scale-result-lg"
               />
             ) : (
-              <p className="text-lg text-ink">{result.result_text}</p>
+              <p className="a11y-scale-result-lg text-ink">{result.result_text}</p>
             );
           })()}
           {/* Fracción exacta (arriba) y decimal (abajo) mostrados juntos —

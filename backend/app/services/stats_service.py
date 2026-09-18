@@ -32,10 +32,12 @@ from typing import List, Literal
 import sympy
 
 from app.services.stat_functions import (
+    Iqr,
     Mad,
     Mean,
     Median,
     Mode,
+    Percentile,
     Range,
     Stdev,
     StdevPop,
@@ -60,7 +62,9 @@ def _to_sympy_numbers(values: List[float]) -> List[sympy.Expr]:
 # ---------------------------------------------------------------------------
 
 
-def descriptive_stat(values: List[float], stat: str, variance_kind: VarianceKind) -> ScalarResult:
+def descriptive_stat(
+    values: List[float], stat: str, variance_kind: VarianceKind, percentile_p: float | None = None
+) -> ScalarResult:
     args = _to_sympy_numbers(values)
     if stat == "mean":
         return ScalarResult(Mean(*args))
@@ -88,7 +92,77 @@ def descriptive_stat(values: List[float], stat: str, variance_kind: VarianceKind
     if stat == "stdev":
         fn = StdevPop if variance_kind == "population" else Stdev
         return ScalarResult(fn(*args))
+    # Módulo M0 (spec_graficacion_matrices_estadistica_unidades.md, sección
+    # 6.1): cuartiles/percentiles/RIQ — misma lista de valores, sin UI de
+    # entrada nueva (reutiliza StatisticsDescriptiveRequest).
+    if stat == "q1":
+        return ScalarResult(Percentile(sympy.Integer(25), *args))
+    if stat == "q2":
+        return ScalarResult(Percentile(sympy.Integer(50), *args))
+    if stat == "q3":
+        return ScalarResult(Percentile(sympy.Integer(75), *args))
+    if stat == "iqr":
+        return ScalarResult(Iqr(*args))
+    if stat == "percentile":
+        if percentile_p is None:
+            raise ValueError("El estadístico 'percentile' requiere el parámetro percentile_p (0-100).")
+        return ScalarResult(Percentile(sympy.Rational(str(percentile_p)), *args))
     raise ValueError(f"Estadístico desconocido: {stat!r}.")
+
+
+# ---------------------------------------------------------------------------
+# Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md, sección
+# 6.2): correlación y regresión lineal simple. A diferencia del resto de
+# Descriptiva, opera sobre PARES (x,y) — funciones planas nuevas, no
+# sympy.Function, porque no necesitan quedar sin evaluar ante un símbolo
+# (siempre reciben listas numéricas concretas desde el endpoint).
+# ---------------------------------------------------------------------------
+
+
+def linear_correlation(x: List[float], y: List[float]) -> ScalarResult:
+    """Coeficiente de correlación de Pearson (r)."""
+    if len(x) != len(y):
+        raise ValueError(f"x e y deben tener la misma longitud; recibidas {len(x)} y {len(y)}.")
+    if len(x) < 2:
+        raise ValueError("La correlación necesita al menos 2 pares (x,y).")
+    xs = _to_sympy_numbers(x)
+    ys = _to_sympy_numbers(y)
+    n = len(xs)
+    mx = sympy.Add(*xs) / n
+    my = sympy.Add(*ys) / n
+    sxy = sympy.Add(*[(xi - mx) * (yi - my) for xi, yi in zip(xs, ys)])
+    sxx = sympy.Add(*[(xi - mx) ** 2 for xi in xs])
+    syy = sympy.Add(*[(yi - my) ** 2 for yi in ys])
+    if sxx == 0 or syy == 0:
+        raise ValueError("La correlación no está definida cuando x o y son constantes (varianza cero).")
+    return ScalarResult(sympy.simplify(sxy / sympy.sqrt(sxx * syy)))
+
+
+def linear_regression_slope(x: List[float], y: List[float]) -> ScalarResult:
+    if len(x) != len(y):
+        raise ValueError(f"x e y deben tener la misma longitud; recibidas {len(x)} y {len(y)}.")
+    if len(x) < 2:
+        raise ValueError("La regresión necesita al menos 2 pares (x,y).")
+    xs = _to_sympy_numbers(x)
+    ys = _to_sympy_numbers(y)
+    n = len(xs)
+    mx = sympy.Add(*xs) / n
+    my = sympy.Add(*ys) / n
+    sxy = sympy.Add(*[(xi - mx) * (yi - my) for xi, yi in zip(xs, ys)])
+    sxx = sympy.Add(*[(xi - mx) ** 2 for xi in xs])
+    if sxx == 0:
+        raise ValueError("La pendiente no está definida cuando todos los x son iguales (recta vertical).")
+    return ScalarResult(sympy.simplify(sxy / sxx))
+
+
+def linear_regression_intercept(x: List[float], y: List[float]) -> ScalarResult:
+    xs = _to_sympy_numbers(x)
+    ys = _to_sympy_numbers(y)
+    n = len(xs)
+    mx = sympy.Add(*xs) / n
+    my = sympy.Add(*ys) / n
+    slope = linear_regression_slope(x, y).value
+    return ScalarResult(sympy.simplify(my - slope * mx))
 
 
 # ---------------------------------------------------------------------------
@@ -177,3 +251,96 @@ def z_score(mu: float, sigma: float, x: float) -> ScalarResult:
     mu_sym, sigma_sym, x_sym = sympy.Rational(str(mu)), sympy.Rational(str(sigma)), sympy.Rational(str(x))
     _validate_normal_params(sigma_sym)
     return ScalarResult((x_sym - mu_sym) / sigma_sym)
+
+
+# ---------------------------------------------------------------------------
+# Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7):
+# Poisson, uniforme, exponencial. Mismo patrón que Binomial (Poisson,
+# discreta) y Normal (uniforme/exponencial, continuas) de arriba.
+# ---------------------------------------------------------------------------
+
+
+def _validate_poisson_params(lam: sympy.Expr) -> None:
+    if lam <= 0:
+        raise ValueError("λ debe ser mayor que 0.")
+
+
+def poisson_pmf(lam: float, k: int) -> ScalarResult:
+    lam_sym = sympy.Rational(str(lam))
+    _validate_poisson_params(lam_sym)
+    if k < 0:
+        raise ValueError("k debe ser un entero no negativo.")
+    return ScalarResult(sympy.exp(-lam_sym) * lam_sym**k / sympy.factorial(k))
+
+
+def poisson_cdf(lam: float, k: int) -> ScalarResult:
+    lam_sym = sympy.Rational(str(lam))
+    _validate_poisson_params(lam_sym)
+    total = sympy.Integer(0)
+    for i in range(0, k + 1):
+        total += lam_sym**i / sympy.factorial(i)
+    return ScalarResult(sympy.exp(-lam_sym) * total)
+
+
+def poisson_expected_value(lam: float) -> ScalarResult:
+    lam_sym = sympy.Rational(str(lam))
+    _validate_poisson_params(lam_sym)
+    return ScalarResult(lam_sym)
+
+
+def poisson_variance(lam: float) -> ScalarResult:
+    lam_sym = sympy.Rational(str(lam))
+    _validate_poisson_params(lam_sym)
+    return ScalarResult(lam_sym)
+
+
+def _validate_uniform_params(a: sympy.Expr, b: sympy.Expr) -> None:
+    if a >= b:
+        raise ValueError("a debe ser menor que b.")
+
+
+def uniform_cdf(a: float, b: float, x: float) -> ScalarResult:
+    a_sym, b_sym, x_sym = sympy.Rational(str(a)), sympy.Rational(str(b)), sympy.Rational(str(x))
+    _validate_uniform_params(a_sym, b_sym)
+    if x_sym <= a_sym:
+        return ScalarResult(sympy.Integer(0))
+    if x_sym >= b_sym:
+        return ScalarResult(sympy.Integer(1))
+    return ScalarResult((x_sym - a_sym) / (b_sym - a_sym))
+
+
+def uniform_expected_value(a: float, b: float) -> ScalarResult:
+    a_sym, b_sym = sympy.Rational(str(a)), sympy.Rational(str(b))
+    _validate_uniform_params(a_sym, b_sym)
+    return ScalarResult((a_sym + b_sym) / 2)
+
+
+def uniform_variance(a: float, b: float) -> ScalarResult:
+    a_sym, b_sym = sympy.Rational(str(a)), sympy.Rational(str(b))
+    _validate_uniform_params(a_sym, b_sym)
+    return ScalarResult((b_sym - a_sym) ** 2 / 12)
+
+
+def _validate_exponential_params(lam: sympy.Expr) -> None:
+    if lam <= 0:
+        raise ValueError("λ debe ser mayor que 0.")
+
+
+def exponential_cdf(lam: float, x: float) -> ScalarResult:
+    lam_sym, x_sym = sympy.Rational(str(lam)), sympy.Rational(str(x))
+    _validate_exponential_params(lam_sym)
+    if x_sym < 0:
+        return ScalarResult(sympy.Integer(0))
+    return ScalarResult(1 - sympy.exp(-lam_sym * x_sym))
+
+
+def exponential_expected_value(lam: float) -> ScalarResult:
+    lam_sym = sympy.Rational(str(lam))
+    _validate_exponential_params(lam_sym)
+    return ScalarResult(1 / lam_sym)
+
+
+def exponential_variance(lam: float) -> ScalarResult:
+    lam_sym = sympy.Rational(str(lam))
+    _validate_exponential_params(lam_sym)
+    return ScalarResult(1 / lam_sym**2)

@@ -99,3 +99,106 @@ def test_graph_parse_error_propagates():
     assert body["success"] is False
     assert body["error_code"] == "PARSE_ERROR"
     assert body["operation"] == "graph_2d"
+
+
+# ---------------------------------------------------------------------------
+# Módulo I0 (spec_graficacion_matrices_estadistica_unidades.md, Fase I):
+# POST /graph/polar. r=1 debe trazar el círculo unitario completo; se
+# verifica contra el caso conocido del spec (sección 10: "r=1 es un
+# círculo unitario") y contra la regresión de /graph/2d y /graph/parametric.
+# ---------------------------------------------------------------------------
+
+
+def _polar(r_expression, **kwargs):
+    payload = {"r_expression": r_expression, **kwargs}
+    return client.post("/api/v1/graph/polar", json=payload)
+
+
+def test_polar_unit_circle_r_equals_1():
+    response = _polar("1")
+    body = response.json()
+    assert body["success"] is True
+    assert body["operation"] == "graph_polar"
+    trace = body["graph_data"]["traces"][0]
+    for x, y in zip(trace["x"], trace["y"], strict=True):
+        assert abs(math.hypot(x, y) - 1.0) < 1e-6
+
+
+def test_polar_spiral_r_equals_theta_grows_with_theta():
+    response = _polar("theta", theta_min=0, theta_max=4 * math.pi)
+    body = response.json()
+    assert body["success"] is True
+    trace = body["graph_data"]["traces"][0]
+    radii = [math.hypot(x, y) for x, y in zip(trace["x"], trace["y"], strict=True)]
+    # r=theta es monótonamente creciente en [0, 4*pi) -> el radio en el
+    # último punto debe ser mayor que en el primero.
+    assert radii[-1] > radii[0]
+
+
+def test_polar_wrong_variable_returns_invalid_variable():
+    response = _polar("phi + 1", variable="theta")
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_code"] == "INVALID_VARIABLE"
+
+
+def test_polar_parse_error_propagates():
+    response = _polar("eval(1)")
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_code"] == "PARSE_ERROR"
+    assert body["operation"] == "graph_polar"
+
+
+def test_regression_graph_2d_and_parametric_unaffected_by_polar():
+    response_2d = _graph(["x**2"], x_min=-3, x_max=3, samples=51)
+    assert response_2d.json()["success"] is True
+
+    response_param = client.post(
+        "/api/v1/graph/parametric",
+        json={"x_expression": "cos(t)", "y_expression": "sin(t)", "parameter": "t"},
+    )
+    body_param = response_param.json()
+    assert body_param["success"] is True
+    trace = body_param["graph_data"]["traces"][0]
+    for x, y in zip(trace["x"], trace["y"], strict=True):
+        assert abs(math.hypot(x, y) - 1.0) < 1e-6
+
+
+# ---------------------------------------------------------------------------
+# Módulo J2 (spec_graficacion_matrices_estadistica_unidades.md, sección
+# 3.2): caso de referencia para /graph/3d usado también en Lite
+# (tests/graphing.test.ts::analyzeGraphSurface3D, "z=x+y: cada punto de la
+# grilla cumple z=x+y") — z=x+y es un plano, cada punto de la grilla debe
+# cumplir z===x+y exactamente. Se agrega aquí porque /graph/3d todavía no
+# tenía un test propio en esta suite (solo se ejercitaba indirectamente
+# vía el router).
+# ---------------------------------------------------------------------------
+
+
+def test_graph_3d_plane_z_equals_x_plus_y_matches_every_grid_point():
+    response = client.post(
+        "/api/v1/graph/3d",
+        json={"expression": "x+y", "variables": ["x", "y"], "x_range": [-3, 3], "y_range": [-3, 3]},
+    )
+    body = response.json()
+    assert body["success"] is True
+    trace = body["graph_data"]["traces"][0]
+    assert trace["type"] == "surface"
+    xs = trace["x"]
+    ys = trace["y"]
+    z_grid = trace["z"]
+    for j, y in enumerate(ys):
+        for i, x in enumerate(xs):
+            assert abs(z_grid[j][i] - (x + y)) < 1e-9
+
+
+def test_graph_3d_paraboloid_minimum_near_origin():
+    response = client.post(
+        "/api/v1/graph/3d",
+        json={"expression": "x**2+y**2", "variables": ["x", "y"], "x_range": [-2, 2], "y_range": [-2, 2]},
+    )
+    body = response.json()
+    z_grid = body["graph_data"]["traces"][0]["z"]
+    min_z = min(min(row) for row in z_grid)
+    assert 0 <= min_z < 0.1

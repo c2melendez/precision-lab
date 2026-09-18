@@ -6,7 +6,9 @@
  */
 
 import type { MathfieldElement } from "mathlive";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { KeyGlyph, BOX } from "./KeyGlyph";
+import { triggerKeyFeedback } from "../utils/keyFeedback";
 
 interface Cell {
   label: React.ReactNode;
@@ -50,8 +52,13 @@ export function SimpleKeyboard({ field, onSubmit }: SimpleKeyboardProps) {
     if (cell.insert) field?.insert(cell.insert);
   }
 
+  // Fase V, Módulo V0: mismo patrón de delegación que NaturalMathKeyboard.
+  function handleKeyboardClickCapture(e: ReactMouseEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest("button")) triggerKeyFeedback();
+  }
+
   return (
-    <div className="rounded-lg bg-chrome p-3">
+    <div className="rounded-lg bg-chrome p-3" onClickCapture={handleKeyboardClickCapture}>
       {ROWS.map((row, i) => (
         <div key={i} className="mb-1.5 grid grid-cols-4 gap-1.5 last:mb-0">
           {row.map((cell, j) => (

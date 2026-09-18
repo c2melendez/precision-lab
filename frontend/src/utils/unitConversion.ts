@@ -1,14 +1,45 @@
-// utils/unitConversion.ts — P7 (spec v2 §8): implementado por separado
-// del equivalente en precision-lab-lite (misma spec, mismo criterio de
-// categorías/unidades, código no compartido entre repos). Vive en
-// frontend/, no en backend/ — decisión confirmada explícita de la spec
-// (100% frontend en ambos repos).
+// unitConversion.ts — P7 (spec v2 §8) + Módulo O0
+// (spec_graficacion_matrices_estadistica_unidades.md, sección 8).
+// AUDITORÍA DEL MÓDULO O0: este archivo se implementa por separado en
+// cada repo (precision-lab-lite: src/engine/unitConversion.ts;
+// precision-lab: frontend/src/utils/unitConversion.ts) — código no
+// compartido entre repos, pero se mantiene byte-idéntico a propósito
+// (confirmado con `diff`, no supuesto) porque no tiene ninguna
+// dependencia de motor (SymPy/Algebrite): es aritmética de factores
+// pura, igual en ambos. Antes de este módulo, los dos archivos YA
+// habían divergido — solo en comentarios, no en factores/lógica
+// (confirmado con diff real) — este módulo también corrige esa
+// divergencia preexistente además de agregar las categorías nuevas,
+// para cumplir el DoD de "diff vacío" del propio módulo.
 //
-// Solo las 7 categorías mínimas que pide la spec (Longitud, Masa,
-// Temperatura, Tiempo, Área, Volumen, Velocidad) — no se agregó ninguna
-// categoría adicional.
+// Temperatura es la única categoría sin factor lineal — fórmulas
+// explícitas Celsius/Fahrenheit/Kelvin, sin pasar por la tabla de
+// factores.
+//
+// Almacenamiento digital — DECISIÓN EXPLÍCITA (Módulo O0, no dejarlo
+// implícito): base 1000 (bit/byte/KB/MB/GB/TB), NO 1024. Motivo: es la
+// única opción consistente con el resto de este archivo — TODOS los
+// demás prefijos "kilo-" ya presentes (km=1000 m, kg=1000 g) usan base
+// 1000, y mezclar una convención binaria (1024) solo para
+// almacenamiento habría sido una inconsistencia interna no justificada
+// por la spec. Si se necesita la variante binaria (KiB/MiB/GiB) en el
+// futuro, debería ser una categoría/etiqueta aparte, no una
+// reinterpretación silenciosa de KB/MB/GB.
 
-export type UnitCategory = "length" | "mass" | "temperature" | "time" | "area" | "volume" | "speed";
+export type UnitCategory =
+  | "length"
+  | "mass"
+  | "temperature"
+  | "time"
+  | "area"
+  | "volume"
+  | "speed"
+  // Módulo O0 (spec_graficacion_matrices_estadistica_unidades.md, sección 8).
+  | "storage"
+  | "pressure"
+  | "energy"
+  | "power"
+  | "force";
 
 export const CATEGORY_LABELS: Record<UnitCategory, string> = {
   length: "Longitud",
@@ -18,13 +49,23 @@ export const CATEGORY_LABELS: Record<UnitCategory, string> = {
   area: "Área",
   volume: "Volumen",
   speed: "Velocidad",
+  storage: "Almacenamiento digital",
+  pressure: "Presión",
+  energy: "Energía",
+  power: "Potencia",
+  force: "Fuerza",
 };
 
 interface UnitDef {
   label: string;
+  /** Factor multiplicativo respecto a la unidad base de la categoría. No
+   * aplica a "temperature" (ver convertTemperature). */
   factor?: number;
 }
 
+// Unidad base de cada categoría (factor 1): metros, kilogramos, segundos,
+// metros cuadrados, litros, metros/segundo, bytes, pascales, joules,
+// watts, newtons.
 export const UNITS: Record<UnitCategory, Record<string, UnitDef>> = {
   length: {
     mm: { label: "Milímetros (mm)", factor: 0.001 },
@@ -80,9 +121,44 @@ export const UNITS: Record<UnitCategory, Record<string, UnitDef>> = {
     knot: { label: "Nudos (kn)", factor: 0.5144444444444445 },
     fps: { label: "Pies/segundo (ft/s)", factor: 0.3048 },
   },
+  // Módulo O0 (spec_graficacion_matrices_estadistica_unidades.md, sección
+  // 8) — base 1000, ver decisión explícita en la cabecera del archivo.
+  storage: {
+    bit: { label: "Bits (bit)", factor: 0.125 },
+    byte: { label: "Bytes (B)", factor: 1 },
+    kb: { label: "Kilobytes (KB)", factor: 1000 },
+    mb: { label: "Megabytes (MB)", factor: 1_000_000 },
+    gb: { label: "Gigabytes (GB)", factor: 1_000_000_000 },
+    tb: { label: "Terabytes (TB)", factor: 1_000_000_000_000 },
+  },
+  pressure: {
+    pa: { label: "Pascales (Pa)", factor: 1 },
+    atm: { label: "Atmósferas (atm)", factor: 101325 },
+    bar: { label: "Bar", factor: 100000 },
+    psi: { label: "Libras por pulgada² (psi)", factor: 6894.757293168361 },
+    mmhg: { label: "Milímetros de mercurio (mmHg)", factor: 133.322387415 },
+  },
+  energy: {
+    j: { label: "Julios (J)", factor: 1 },
+    cal: { label: "Calorías (cal)", factor: 4.184 },
+    kwh: { label: "Kilovatios-hora (kWh)", factor: 3_600_000 },
+    btu: { label: "BTU", factor: 1055.05585262 },
+  },
+  power: {
+    w: { label: "Vatios (W)", factor: 1 },
+    kw: { label: "Kilovatios (kW)", factor: 1000 },
+    hp: { label: "Caballos de fuerza (hp)", factor: 745.6998715822702 },
+  },
+  force: {
+    n: { label: "Newtons (N)", factor: 1 },
+    lbf: { label: "Libra-fuerza (lbf)", factor: 4.4482216152605 },
+    kgf: { label: "Kilogramo-fuerza (kgf)", factor: 9.80665 },
+  },
 };
 
 function convertTemperature(value: number, from: string, to: string): number {
+  // Paso intermedio siempre por Kelvin — evita 3x2=6 fórmulas cruzadas,
+  // solo hacen falta 3 "a Kelvin" + 3 "de Kelvin".
   let kelvin: number;
   switch (from) {
     case "c":

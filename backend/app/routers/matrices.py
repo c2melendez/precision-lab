@@ -310,6 +310,72 @@ async def matrix_norm(payload: MatrixSingleRequest, request: Request) -> MathRes
     )
 
 
+@router.post("/matrix/trace", response_model=MathResponse)
+async def matrix_trace(payload: MatrixSingleRequest, request: Request) -> MathResponse:
+    """Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md,
+    sección 5) — mismo patrón que /matrix/norm: escalar de una sola
+    matriz."""
+    log_request_event(request.state.request_id, "matrix_trace_request")
+
+    try:
+        matrix = matrix_service.parse_matrix(payload.matrix)
+    except parsing.ParseSecurityError as exc:
+        return _error(request, OperationType.MATRIX_TRACE, ErrorCode.PARSE_ERROR, str(exc))
+    except ComplexityLimitError as exc:
+        return _error(request, OperationType.MATRIX_TRACE, ErrorCode.COMPLEXITY_LIMIT, str(exc))
+
+    try:
+        result = matrix_service.trace(matrix)
+    except matrix_service.DimensionMismatchError as exc:
+        return _error(request, OperationType.MATRIX_TRACE, ErrorCode.DIMENSION_MISMATCH, str(exc))
+
+    return MathResponse(
+        success=True,
+        operation=OperationType.MATRIX_TRACE,
+        request_id=request.state.request_id,
+        result_type=ResultType.SCALAR,
+        result_text=str(result.value),
+        result_latex=sympy.latex(result.value),
+        result_approx=float(result.value) if result.value.is_real else None,
+        steps=result.steps,
+        has_detailed_steps=result.has_detailed_steps,
+        warnings=result.warnings,
+        duration_ms=_duration_ms(request),
+    )
+
+
+@router.post("/matrix/rank", response_model=MathResponse)
+async def matrix_rank(payload: MatrixSingleRequest, request: Request) -> MathResponse:
+    """Módulo L0 — rango expuesto como operación con resultado visible;
+    reutiliza Matrix.rank() de SymPy (el mismo cálculo interno de la
+    clasificación de sistemas de Fase B, sin tocar esa lógica ni
+    duplicarla)."""
+    log_request_event(request.state.request_id, "matrix_rank_request")
+
+    try:
+        matrix = matrix_service.parse_matrix(payload.matrix)
+    except parsing.ParseSecurityError as exc:
+        return _error(request, OperationType.MATRIX_RANK, ErrorCode.PARSE_ERROR, str(exc))
+    except ComplexityLimitError as exc:
+        return _error(request, OperationType.MATRIX_RANK, ErrorCode.COMPLEXITY_LIMIT, str(exc))
+
+    result = matrix_service.rank(matrix)
+
+    return MathResponse(
+        success=True,
+        operation=OperationType.MATRIX_RANK,
+        request_id=request.state.request_id,
+        result_type=ResultType.SCALAR,
+        result_text=str(result.value),
+        result_latex=sympy.latex(result.value),
+        result_approx=float(result.value),
+        steps=result.steps,
+        has_detailed_steps=result.has_detailed_steps,
+        warnings=result.warnings,
+        duration_ms=_duration_ms(request),
+    )
+
+
 @router.post("/matrix/eigen", response_model=MathResponse)
 async def matrix_eigen(payload: MatrixEigenRequest, request: Request) -> MathResponse:
     """Fase 2 — passthrough trivial real (sección 2)."""

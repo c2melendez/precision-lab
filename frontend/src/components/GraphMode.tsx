@@ -1,18 +1,21 @@
 /**
- * src/components/GraphMode.tsx — modo Gráficas (spec, sección 11): tres
- * submodos (2D / 3D / Paramétrico), cada uno con su propio formulario,
- * conectados a `POST /graph/2d`, `POST /graph/3d` y `POST /graph/parametric`
- * respectivamente. `GraphViewer` se carga vía `React.lazy` (import
+ * src/components/GraphMode.tsx — modo Gráficas (spec, sección 11, más
+ * Módulo I0 de spec_graficacion_matrices_estadistica_unidades.md): cuatro
+ * submodos (2D / 3D / Paramétrico / Polar), cada uno con su propio
+ * formulario, conectados a `POST /graph/2d`, `POST /graph/3d`,
+ * `POST /graph/parametric` y `POST /graph/polar` respectivamente.
+ * `GraphViewer` se carga vía `React.lazy` (import
  * dinámico real de Plotly — nunca en el bundle principal, Módulo 12)
  * solo cuando hay `graph_data` que mostrar; distingue superficie 3D de
  * curva 2D/paramétrica por el `trace.type` que ya trae la respuesta.
  */
 
-import { lazy, Suspense, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import type { MathfieldElement } from "mathlive";
 
 import type { MathResponse } from "../api/client";
 import { submitAndRecord } from "../api/submitWithHistory";
+import { useGraphColorPaletteStore } from "../store/useGraphColorPaletteStore";
 import { useUIStore } from "../store/useUIStore";
 import { latexToBackendSyntax, NaturalMathField } from "./NaturalMathField";
 import { NaturalMathKeyboard } from "./NaturalMathKeyboard";
@@ -20,23 +23,30 @@ import { ResultPanel } from "./ResultPanel";
 
 const GraphViewer = lazy(() => import("./GraphViewer"));
 
-// Fase D (spec UX estilo ClassCalc §6): mismos colores que
+// Fase D (spec UX estilo ClassCalc §6): estos colores coincidían con
 // GraphViewer.CURVE_COLORS, duplicados aquí a propósito — importar el
 // export nombrado desde GraphViewer.tsx forzaría a que ese archivo se
 // incluya en el bundle principal en vez de cargarse solo vía
 // React.lazy() cuando el componente realmente se monta (Módulo 12).
+// Fase T, Módulo T0: unificado en useGraphColorPaletteStore.ts, que no
+// depende de GraphViewer.tsx — sigue sin forzar el bundle eager.
 
 const MAX_EXPRESSIONS = 5;
 
-type GraphKind = "2d" | "3d" | "parametric";
+type GraphKind = "2d" | "3d" | "parametric" | "polar";
 
 const GRAPH_KIND_LABELS: Record<GraphKind, string> = {
   "2d": "2D",
   "3d": "3D",
   parametric: "Paramétrica",
+  polar: "Polar",
 };
 
-const CURVE_COLORS = ["#E8A33D", "#3E7C74", "#9B7FD6", "#D97757", "#5B94C9"];
+// Fase T, Módulo T0: CURVE_COLORS ya no vive duplicado aquí — se
+// unificó en useGraphColorPaletteStore.ts (no importa nada de
+// GraphViewer.tsx, así que no reintroduce el problema de bundle eager
+// que el comentario de arriba explica). El color de la paleta activa se
+// lee dentro de Graph2DForm vía el hook, no como constante de módulo.
 
 function AnalysisPanel({ result }: { result: MathResponse }) {
   if (!result.graph_data?.analysis) return null;
@@ -108,6 +118,9 @@ function ResultArea({
 }
 
 function Graph2DForm() {
+  // Fase T, Módulo T0: fuente única de verdad, ver comentario donde
+  // antes vivía la constante CURVE_COLORS.
+  const colors = useGraphColorPaletteStore((s) => s.colors);
   const formRef = useRef<HTMLFormElement>(null);
   const [latexRows, setLatexRows] = useState<string[]>([""]);
   const [mathFields, setMathFields] = useState<(MathfieldElement | null)[]>([null]);
@@ -124,6 +137,20 @@ function Graph2DForm() {
   const setErrorMessage = useUIStore((state) => state.setErrorMessage);
   const isLoading = useUIStore((state) => state.isLoading);
   const setActiveMode = useUIStore((state) => state.setActiveMode);
+  const pendingGraphResult = useUIStore((state) => state.pendingGraphResult);
+  const setPendingGraphResult = useUIStore((state) => state.setPendingGraphResult);
+
+  // Fase F (Módulo F3): consume el "puente" del botón Graficar (ver
+  // useUIStore.ts) una sola vez -- si hay un resultado pendiente al
+  // montar/actualizar, lo adopta como si el usuario lo hubiera pedido
+  // acá mismo, y lo vacía del store para no re-aplicarlo en cada render
+  // ni la próxima vez que el usuario entre a Graph Mode por su cuenta.
+  useEffect(() => {
+    if (pendingGraphResult !== null) {
+      setLastResult(pendingGraphResult);
+      setPendingGraphResult(null);
+    }
+  }, [pendingGraphResult, setPendingGraphResult]);
 
   // Fix: bug real preexistente (ver informe a Carlos) — pasar
   // `fieldRef={(el) => setMathFields(...)}` inline en el JSX de abajo
@@ -218,7 +245,7 @@ function Graph2DForm() {
           <div key={index} className="flex items-center gap-2">
             <span
               className="h-3 w-3 shrink-0 rounded-full"
-              style={{ backgroundColor: CURVE_COLORS[index % CURVE_COLORS.length] }}
+              style={{ backgroundColor: colors[index % colors.length] }}
               aria-hidden="true"
             />
             <div className="flex-1">
@@ -360,7 +387,7 @@ function Graph2DForm() {
       </button>
 
       <div className="border-t border-paper-line pt-4">
-        <ResultArea result={lastResult} isLoading={isLoading} colors={CURVE_COLORS} />
+        <ResultArea result={lastResult} isLoading={isLoading} colors={colors} />
       </div>
     </form>
   );
@@ -705,6 +732,136 @@ function GraphParametricForm() {
   );
 }
 
+function GraphPolarForm() {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [rLatex, setRLatex] = useState("");
+  const [rMathField, setRMathField] = useState<MathfieldElement | null>(null);
+  const [variable, setVariable] = useState("theta");
+  const [thetaMin, setThetaMin] = useState("0");
+  const [thetaMax, setThetaMax] = useState("6.283185307179586");
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<MathResponse | null>(null);
+
+  const setLoading = useUIStore((state) => state.setLoading);
+  const setErrorMessage = useUIStore((state) => state.setErrorMessage);
+  const isLoading = useUIStore((state) => state.isLoading);
+  const setActiveMode = useUIStore((state) => state.setActiveMode);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const trimmedR = latexToBackendSyntax(rLatex);
+    if (!trimmedR) {
+      setValidationError("r(θ) debe tener contenido.");
+      return;
+    }
+    const parsedThetaMin = Number(thetaMin);
+    const parsedThetaMax = Number(thetaMax);
+    if (Number.isNaN(parsedThetaMin) || Number.isNaN(parsedThetaMax)) {
+      setValidationError("θ mínimo y θ máximo deben ser números.");
+      return;
+    }
+    setValidationError(null);
+
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const result = await submitAndRecord(
+        "/graph/polar",
+        {
+          r_expression: trimmedR,
+          variable: variable.trim() || "theta",
+          theta_min: parsedThetaMin,
+          theta_max: parsedThetaMax,
+        },
+        `r=${trimmedR}`,
+      );
+      setLastResult(result);
+      if (!result.success) {
+        setErrorMessage(result.error_message ?? "Ocurrió un error.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-1">
+        <span className="block text-sm text-muted">r(θ)</span>
+        <NaturalMathField
+          latex={rLatex}
+          onLatexChange={setRLatex}
+          ariaLabel="r(θ)"
+          placeholder="1"
+          fieldRef={setRMathField}
+        />
+      </div>
+
+      <NaturalMathKeyboard
+        field={rMathField}
+        onSubmit={() => formRef.current?.requestSubmit()}
+        onGoToDerivative={() => setActiveMode("derivative")}
+      />
+
+      <div className="flex flex-wrap gap-4">
+        <div className="space-y-1">
+          <label htmlFor="polar-variable" className="block text-sm text-muted">
+            Variable
+          </label>
+          <input
+            id="polar-variable"
+            type="text"
+            value={variable}
+            onChange={(e) => setVariable(e.target.value)}
+            className="w-16 rounded border border-paper-line bg-paper-soft px-2 py-1 text-sm"
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="polar-thetamin" className="block text-sm text-muted">
+            θ mínimo
+          </label>
+          <input
+            id="polar-thetamin"
+            type="text"
+            value={thetaMin}
+            onChange={(e) => setThetaMin(e.target.value)}
+            className="w-28 rounded border border-paper-line bg-paper-soft px-2 py-1 text-sm"
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="polar-thetamax" className="block text-sm text-muted">
+            θ máximo
+          </label>
+          <input
+            id="polar-thetamax"
+            type="text"
+            value={thetaMax}
+            onChange={(e) => setThetaMax(e.target.value)}
+            className="w-28 rounded border border-paper-line bg-paper-soft px-2 py-1 text-sm"
+          />
+        </div>
+      </div>
+
+      {validationError && (
+        <p role="alert" className="text-sm text-red-600">
+          {validationError}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        className="rounded bg-graph px-4 py-2 text-sm font-medium text-white hover:bg-graph/90"
+      >
+        Graficar curva
+      </button>
+
+      <div className="border-t border-paper-line pt-4">
+        <ResultArea result={lastResult} isLoading={isLoading} />
+      </div>
+    </form>
+  );
+}
+
 export function GraphMode() {
   const [kind, setKind] = useState<GraphKind>("2d");
 
@@ -733,6 +890,7 @@ export function GraphMode() {
       {kind === "2d" && <Graph2DForm />}
       {kind === "3d" && <Graph3DForm />}
       {kind === "parametric" && <GraphParametricForm />}
+      {kind === "polar" && <GraphPolarForm />}
     </div>
   );
 }

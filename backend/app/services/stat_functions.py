@@ -146,3 +146,50 @@ class StdevPop(Function):
         if len(args) < 1:
             raise ValueError("stdevpop necesita al menos 1 valor.")
         return sympy.sqrt(_variance_population(args))
+
+
+# Módulo M0 (spec_graficacion_matrices_estadistica_unidades.md, sección
+# 6.1): cuartiles/percentiles/RIQ. Convención DEDUCIBLE (no especificada
+# antes, igual que la muestral n-1 de Variance/Stdev arriba): interpolación
+# lineal entre los dos rangos más cercanos — la misma que usa
+# `numpy.percentile` por defecto y Excel `PERCENTILE.INC`, la más común en
+# calculadoras/hojas de cálculo. Se documenta aquí para no dejarlo
+# implícito, tal como pide el spec para toda decisión DEDUCIBLE.
+def _percentile(args, p) -> sympy.Expr:
+    values = sorted(args)
+    n = len(values)
+    if n == 1:
+        return values[0]
+    index = (sympy.Rational(p) / 100) * (n - 1)
+    lower = int(sympy.floor(index))
+    upper = int(sympy.ceiling(index))
+    if lower == upper:
+        return values[lower]
+    frac = index - lower
+    return values[lower] + frac * (values[upper] - values[lower])
+
+
+class Percentile(Function):
+    """Primer argumento: p (0-100). Resto: los datos — mismo orden que
+    usa precision-lab-lite/statFunctions.ts para mantener paridad de
+    firma entre motores."""
+
+    @classmethod
+    def eval(cls, p, *args):
+        if not _all_numeric((p, *args)):
+            return None
+        if not args:
+            raise ValueError("percentile necesita al menos un valor de datos.")
+        if p < 0 or p > 100:
+            raise ValueError("El percentil debe estar entre 0 y 100.")
+        return _percentile(args, p)
+
+
+class Iqr(Function):
+    @classmethod
+    def eval(cls, *args):
+        if not _all_numeric(args):
+            return None
+        if not args:
+            raise ValueError("iqr necesita al menos un valor.")
+        return _percentile(args, 75) - _percentile(args, 25)

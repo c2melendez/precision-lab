@@ -27,6 +27,8 @@ import { UnitsMode } from "./components/UnitsMode";
 import { AjustesPopover } from "./components/AjustesPopover";
 import { KeyboardDock } from "./components/KeyboardDock";
 import { useUIStore, type CalculatorMode } from "./store/useUIStore";
+import { useLayoutModeStore } from "./store/useLayoutModeStore";
+import { useMinWidthMediaQuery, FLOATING_MIN_WIDTH_PX } from "./hooks/useMinWidthMediaQuery";
 
 const MODE_LABELS: Record<CalculatorMode, string> = {
   basic: "Científica",
@@ -97,6 +99,16 @@ export default function App() {
   const setActiveMode = useUIStore((state) => state.setActiveMode);
   const lastErrorMessage = useUIStore((state) => state.lastErrorMessage);
   const [showHistory, setShowHistory] = useState(false);
+  // Módulo P3: sin dock fijo en "stacked" (KeyboardDock retorna null ahí).
+  // Módulo P4: tampoco hay dock fijo en "floating" cuando el viewport es
+  // lo bastante ancho (el teclado vive en su FloatingWindow) — pero SÍ lo
+  // hay si Flotante degrada a Enfoque en viewport angosto, por eso se usa
+  // el mismo hook que KeyboardDock.tsx, no basta con mirar el string de
+  // layoutMode.
+  const layoutMode = useLayoutModeStore((s) => s.layoutMode);
+  const isFloatingWideEnough = useMinWidthMediaQuery(FLOATING_MIN_WIDTH_PX);
+  const hasFixedDock = !(layoutMode === "stacked" || (layoutMode === "floating" && isFloatingWideEnough));
+  const mainBottomPadding = hasFixedDock ? "pb-56 dt:pb-40" : "pb-8";
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -152,8 +164,12 @@ export default function App() {
         {/* Módulo 0: padding inferior para que el KeyboardDock fijo no
             tape el contenido de ningún modo — cambio de layout global,
             deliberado, ver Cierre del Módulo 0 (mismo criterio que en
-            precision-lab-lite/src/App.tsx). */}
-        <main id="main-content" className="mx-auto min-w-0 max-w-3xl flex-1 px-6 py-8 pb-56 lg:max-w-5xl dt:max-w-[1440px] dt:px-10 dt:pb-40">
+            precision-lab-lite/src/App.tsx). Módulo P3: en "stacked" no
+            hay dock fijo que compensar (ver mainBottomPadding arriba). */}
+        <main
+          id="main-content"
+          className={`mx-auto min-w-0 max-w-3xl flex-1 px-6 py-8 lg:max-w-5xl dt:max-w-[1440px] dt:px-10 ${mainBottomPadding}`}
+        >
           {lastErrorMessage && (
             <p role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {lastErrorMessage}

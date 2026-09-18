@@ -90,7 +90,94 @@ import { ComputeEngine } from "@cortex-js/compute-engine";
 export type CalculusIntent =
   | { kind: "derivative"; variable: string; order: 1 | 2 | 3 | 4 | 5; innerLatex: string }
   | { kind: "integral"; variable: string; lowerBound: string | null; upperBound: string | null; innerLatex: string }
-  | { kind: "limit"; variable: string; point: string; innerLatex: string; direction: "both" | "left" | "right" };
+  | { kind: "limit"; variable: string; point: string; innerLatex: string; direction: "both" | "left" | "right" }
+  | { kind: "ode"; cleanedExpression: string }
+  | { kind: "residue"; expressionLatex: string; pointLatex: string }
+  | { kind: "singularities"; expressionLatex: string };
+
+// ---------------------------------------------------------------------
+// Fase F (spec_edo_complejos_tooltips.md §3.2, Módulo F1/F2): Res/Sing.
+// Igual que EDO, esto no pasa por parse_expression_tree con la sintaxis
+// "z=punto" incluida -- se extrae acá y se manda estructurado (dos
+// campos separados) al backend, ver complex_service.py.
+// ---------------------------------------------------------------------
+
+/** Scanner de paréntesis balanceados, igual criterio que
+ * rewriteBinaryFunction (index.ts, Lite) -- necesario porque el cuerpo
+ * de Res()/Sing() puede contener sus propias llamadas a función con
+ * comas internas (ej. "root(z,3)"), así que un split ingenuo por "," se
+ * confundiría. */
+function splitTopLevelComma(text: string): [string, string | null] {
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "(" || ch === "{" || ch === "[") depth++;
+    else if (ch === ")" || ch === "}" || ch === "]") depth--;
+    else if (ch === "," && depth === 0) {
+      return [text.slice(0, i), text.slice(i + 1)];
+    }
+  }
+  return [text, null];
+}
+
+function detectResidue(latex: string): Extract<CalculusIntent, { kind: "residue" }> | null {
+  const trimmed = latex.trim();
+  const match = trimmed.match(/^\\mathrm\{Res\}\\left\((.*)\\right\)$/s);
+  if (!match) return null;
+  const [exprPart, rest] = splitTopLevelComma(match[1]);
+  if (rest === null) return null;
+  const pointMatch = rest.trim().match(/^z\s*=\s*(.+)$/);
+  if (!pointMatch) return null;
+  return { kind: "residue", expressionLatex: exprPart.trim(), pointLatex: pointMatch[1].trim() };
+}
+
+function detectSingularities(latex: string): Extract<CalculusIntent, { kind: "singularities" }> | null {
+  const trimmed = latex.trim();
+  const match = trimmed.match(/^\\mathrm\{Sing\}\\left\((.*)\\right\)$/s);
+  if (!match) return null;
+  return { kind: "singularities", expressionLatex: match[1].trim() };
+}
+
+
+// ---------------------------------------------------------------------
+// EDO (Fase E, spec_edo_complejos_tooltips.md §2.2) — notación prima
+// (y', y'', ...), DELIBERADAMENTE distinta de \frac{d}{dx} para no
+// colisionar con detectDerivative (que exige ese prefijo LaTeX exacto,
+// nunca presente en notación prima). Verificado con los casos de la
+// sección "Tests" del Módulo E3: ninguna expresión con \frac{d}{dx}
+// dispara detectODE (no contiene el token "y'"), y ninguna EDO en
+// notación prima dispara detectDerivative (no empieza con \frac{d...).
+//
+// A diferencia de derivada/integral/límite, acá no hay "envoltura" que
+// desenvolver: la EDO completa (incluida la condición inicial opcional
+// en el mismo campo, separada por coma — spec 2.2) ES el contenido que
+// se manda tal cual a /ode. El backend (ode_service._substitute_
+// derivatives) es quien cuenta las primas dinámicamente para determinar
+// el orden — este detector solo reconoce la FORMA (¿hay un token y'+
+// seguido, en algún punto, de un '='?), no valida la ecuación.
+// ---------------------------------------------------------------------
+
+// \b antes de 'y' exige que sea un identificador de una sola letra (no
+// el final de otro nombre, ej. "xy'" NO debe matchear "y'" como si xy
+// fuera la variable — el signo de derivada debe pegar a una 'y' sola).
+const ODE_PRIME_TOKEN = /(?:^|[^a-zA-Z])y'+/;
+
+// Tecla "dy/dx" (spec 2.3: "notación alternativa, mismo intent que y'").
+// \frac{dy}{dx} NUNCA matchea DERIVATIVE_PREFIX (ese exige numerador
+// exactamente "d", no "dy" -- verificado arriba con los regex reales) así
+// que no hay colisión. Se normaliza a "y'" ANTES de mandar al backend,
+// que solo entiende notación prima (ode_service.py) -- el backend no
+// necesita saber que existe esta forma alternativa.
+const DY_DX_TOKEN = /\\frac\{dy\}\{dx\}/g;
+
+function detectODE(latex: string): Extract<CalculusIntent, { kind: "ode" }> | null {
+  const trimmed = latex.trim();
+  if (trimmed.length === 0) return null;
+  const normalized = trimmed.replace(DY_DX_TOKEN, "y'");
+  if (!ODE_PRIME_TOKEN.test(normalized)) return null;
+  if (!normalized.includes("=")) return null;
+  return { kind: "ode", cleanedExpression: normalized };
+}
 
 // ---------------------------------------------------------------------
 // Derivada (escáner propio — ver explicación arriba)
@@ -287,5 +374,12 @@ function detectLimit(latex: string): Extract<CalculusIntent, { kind: "limit" }> 
  * (más barato, solo regex); integral y límite comparten el mismo motor
  * de reconocimiento (Compute Engine). */
 export function detectCalculusIntent(latex: string): CalculusIntent | null {
-  return detectDerivative(latex) ?? detectIntegral(latex) ?? detectLimit(latex);
+  return (
+    detectDerivative(latex) ??
+    detectODE(latex) ??
+    detectResidue(latex) ??
+    detectSingularities(latex) ??
+    detectIntegral(latex) ??
+    detectLimit(latex)
+  );
 }

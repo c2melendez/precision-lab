@@ -12,14 +12,19 @@ import { submitAndRecord } from "../api/submitWithHistory";
 import type { MathResponse } from "../api/client";
 import { ResultPanel } from "./ResultPanel";
 
-type SubMode = "descriptive" | "combinatorics" | "distribution";
+type SubMode = "descriptive" | "combinatorics" | "distribution" | "correlation";
 type VarianceKind = "population" | "sample";
-type Distribution = "binomial" | "normal";
+type Distribution = "binomial" | "normal" | "poisson" | "uniform" | "exponential";
 
 const TABS: { id: SubMode; label: string }[] = [
   { id: "descriptive", label: "Descriptiva" },
   { id: "combinatorics", label: "Combinatoria" },
   { id: "distribution", label: "Distribución" },
+  // Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md, sección
+  // 6.2): pestaña propia — opera sobre pares (x,y), no la lista única de
+  // "Descriptiva". Reutiliza el mismo patrón de input de texto separado
+  // por comas dos veces (X, Y) en vez de tocar el input de "Descriptiva".
+  { id: "correlation", label: "Correlación" },
 ];
 
 function parseDataList(raw: string): number[] {
@@ -40,10 +45,12 @@ export function StatisticsMode() {
   // --- Descriptiva ---
   const [dataRaw, setDataRaw] = useState("");
   const [varianceKind, setVarianceKind] = useState<VarianceKind>("population");
+  // Módulo M0 (spec_graficacion_matrices_estadistica_unidades.md, sección 6.1).
+  const [percentileP, setPercentileP] = useState("90");
   const [descriptiveResult, setDescriptiveResult] = useState<MathResponse | null>(null);
   const [descriptiveLoading, setDescriptiveLoading] = useState(false);
 
-  async function runDescriptive(stat: string) {
+  async function runDescriptive(stat: string, percentileP?: number) {
     let values: number[];
     try {
       values = parseDataList(dataRaw);
@@ -71,7 +78,7 @@ export function StatisticsMode() {
     try {
       const result = await submitAndRecord(
         "/statistics/descriptive",
-        { values, stat, variance_kind: varianceKind },
+        { values, stat, variance_kind: varianceKind, percentile_p: percentileP },
         `Estadística descriptiva: ${stat}(${values.join(",")})`,
       );
       setDescriptiveResult(result);
@@ -143,6 +150,98 @@ export function StatisticsMode() {
     }
   }
 
+  // Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7).
+  const [poissonLam, setPoissonLam] = useState("4");
+  const [poissonK, setPoissonK] = useState("2");
+  const [uniformA, setUniformA] = useState("0");
+  const [uniformB, setUniformB] = useState("10");
+  const [uniformX, setUniformX] = useState("5");
+  const [expLam, setExpLam] = useState("2");
+  const [expX, setExpX] = useState("1");
+
+  async function runPoisson(query: "pmf" | "cdf" | "mean" | "variance") {
+    setDistributionLoading(true);
+    try {
+      const result = await submitAndRecord(
+        "/statistics/poisson",
+        { lam: Number(poissonLam), k: Number(poissonK), query },
+        `Poisson(${poissonLam}) ${query}`,
+      );
+      setDistributionResult(result);
+    } finally {
+      setDistributionLoading(false);
+    }
+  }
+
+  async function runUniform(query: "cdf" | "mean" | "variance") {
+    setDistributionLoading(true);
+    try {
+      const result = await submitAndRecord(
+        "/statistics/uniform",
+        { a: Number(uniformA), b: Number(uniformB), x: Number(uniformX), query },
+        `Uniforme(${uniformA},${uniformB}) ${query}`,
+      );
+      setDistributionResult(result);
+    } finally {
+      setDistributionLoading(false);
+    }
+  }
+
+  async function runExponential(query: "cdf" | "mean" | "variance") {
+    setDistributionLoading(true);
+    try {
+      const result = await submitAndRecord(
+        "/statistics/exponential",
+        { lam: Number(expLam), x: Number(expX), query },
+        `Exponencial(${expLam}) ${query}`,
+      );
+      setDistributionResult(result);
+    } finally {
+      setDistributionLoading(false);
+    }
+  }
+
+  // --- Correlación / regresión (Módulo M1) ---
+  const [xRaw, setXRaw] = useState("");
+  const [yRaw, setYRaw] = useState("");
+  const [correlationResult, setCorrelationResult] = useState<MathResponse | null>(null);
+  const [correlationLoading, setCorrelationLoading] = useState(false);
+
+  async function runCorrelation(query: "correlation" | "slope" | "intercept") {
+    let x: number[];
+    let y: number[];
+    try {
+      x = parseDataList(xRaw);
+      y = parseDataList(yRaw);
+    } catch (e) {
+      setCorrelationResult({
+        success: false,
+        operation: "statistics_correlation",
+        request_id: "local",
+        has_detailed_steps: false,
+        error_message: e instanceof Error ? e.message : "Error desconocido.",
+      } as MathResponse);
+      return;
+    }
+    if (x.length !== y.length) {
+      setCorrelationResult({
+        success: false,
+        operation: "statistics_correlation",
+        request_id: "local",
+        has_detailed_steps: false,
+        error_message: `X tiene ${x.length} valores pero Y tiene ${y.length} — deben tener la misma cantidad.`,
+      } as MathResponse);
+      return;
+    }
+    setCorrelationLoading(true);
+    try {
+      const result = await submitAndRecord("/statistics/correlation", { x, y, query }, `Correlación: ${query}`);
+      setCorrelationResult(result);
+    } finally {
+      setCorrelationLoading(false);
+    }
+  }
+
   const inputClass = "w-full rounded border border-paper-line bg-paper-soft px-2 py-1.5 text-sm";
   const btnClass = "rounded border border-paper-line py-2 text-xs text-ink hover:bg-paper";
   const btnPrimaryClass = "rounded bg-graph py-2 text-xs font-medium text-white hover:bg-graph/90";
@@ -187,6 +286,25 @@ export function StatisticsMode() {
             <button type="button" className={btnClass} onClick={() => runDescriptive("min")}>Min</button>
             <button type="button" className={btnClass} onClick={() => runDescriptive("max")}>Max</button>
             <button type="button" className={btnClass} onClick={() => runDescriptive("range")}>Rango</button>
+            <button type="button" className={btnClass} onClick={() => runDescriptive("q1")}>Q1</button>
+            <button type="button" className={btnClass} onClick={() => runDescriptive("q2")}>Q2 (mediana)</button>
+            <button type="button" className={btnClass} onClick={() => runDescriptive("q3")}>Q3</button>
+            <button type="button" className={btnClass} onClick={() => runDescriptive("iqr")}>RIQ</button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted">Percentil</span>
+            <input
+              value={percentileP}
+              onChange={(e) => setPercentileP(e.target.value)}
+              className="w-16 rounded border border-paper-line bg-paper-soft px-2 py-1 text-sm"
+            />
+            <button
+              type="button"
+              className={`${btnClass} flex-1`}
+              onClick={() => runDescriptive("percentile", Number(percentileP))}
+            >
+              Calcular
+            </button>
           </div>
           <div className="flex items-center justify-between rounded border border-paper-line px-2 py-1.5">
             <span className="text-sm text-ink">σ² / s²</span>
@@ -242,7 +360,7 @@ export function StatisticsMode() {
 
       {subMode === "distribution" && (
         <div className="space-y-3">
-          <div className="flex gap-1 rounded-lg border border-paper-line p-1 text-sm">
+          <div className="flex flex-wrap gap-1 rounded-lg border border-paper-line p-1 text-sm">
             <button
               type="button"
               onClick={() => setDistribution("binomial")}
@@ -257,9 +375,31 @@ export function StatisticsMode() {
             >
               Normal
             </button>
+            {/* Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7). */}
+            <button
+              type="button"
+              onClick={() => setDistribution("poisson")}
+              className={distribution === "poisson" ? "flex-1 rounded-md bg-graph py-1.5 text-white" : "flex-1 rounded-md py-1.5 text-muted"}
+            >
+              Poisson
+            </button>
+            <button
+              type="button"
+              onClick={() => setDistribution("uniform")}
+              className={distribution === "uniform" ? "flex-1 rounded-md bg-graph py-1.5 text-white" : "flex-1 rounded-md py-1.5 text-muted"}
+            >
+              Uniforme
+            </button>
+            <button
+              type="button"
+              onClick={() => setDistribution("exponential")}
+              className={distribution === "exponential" ? "flex-1 rounded-md bg-graph py-1.5 text-white" : "flex-1 rounded-md py-1.5 text-muted"}
+            >
+              Exponencial
+            </button>
           </div>
 
-          {distribution === "binomial" ? (
+          {distribution === "binomial" && (
             <>
               <div className="flex gap-2">
                 <label className="flex-1 text-sm text-muted">
@@ -283,7 +423,8 @@ export function StatisticsMode() {
                 <button type="button" className={`${btnClass} col-span-2`} onClick={() => runBinomial("variance")}>Var[X]</button>
               </div>
             </>
-          ) : (
+          )}
+          {distribution === "normal" && (
             <>
               <div className="flex gap-2">
                 <label className="flex-1 text-sm text-muted">
@@ -316,7 +457,98 @@ export function StatisticsMode() {
               <button type="button" className={btnClass} onClick={() => runNormal("range")}>P(a≤X≤b)</button>
             </>
           )}
+          {distribution === "poisson" && (
+            <>
+              <div className="flex gap-2">
+                <label className="flex-1 text-sm text-muted">
+                  λ
+                  <input value={poissonLam} onChange={(e) => setPoissonLam(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+                <label className="flex-1 text-sm text-muted">
+                  k
+                  <input value={poissonK} onChange={(e) => setPoissonK(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" className={btnClass} onClick={() => runPoisson("pmf")}>P(X=k)</button>
+                <button type="button" className={btnClass} onClick={() => runPoisson("cdf")}>P(X≤k)</button>
+                <button type="button" className={btnClass} onClick={() => runPoisson("mean")}>E[X]</button>
+                <button type="button" className={btnClass} onClick={() => runPoisson("variance")}>Var[X]</button>
+              </div>
+            </>
+          )}
+          {distribution === "uniform" && (
+            <>
+              <div className="flex gap-2">
+                <label className="flex-1 text-sm text-muted">
+                  a
+                  <input value={uniformA} onChange={(e) => setUniformA(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+                <label className="flex-1 text-sm text-muted">
+                  b
+                  <input value={uniformB} onChange={(e) => setUniformB(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+                <label className="flex-1 text-sm text-muted">
+                  x
+                  <input value={uniformX} onChange={(e) => setUniformX(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" className={btnClass} onClick={() => runUniform("cdf")}>P(X≤x)</button>
+                <button type="button" className={btnClass} onClick={() => runUniform("mean")}>E[X]</button>
+                <button type="button" className={`${btnClass} col-span-2`} onClick={() => runUniform("variance")}>Var[X]</button>
+              </div>
+            </>
+          )}
+          {distribution === "exponential" && (
+            <>
+              <div className="flex gap-2">
+                <label className="flex-1 text-sm text-muted">
+                  λ
+                  <input value={expLam} onChange={(e) => setExpLam(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+                <label className="flex-1 text-sm text-muted">
+                  x
+                  <input value={expX} onChange={(e) => setExpX(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" className={btnClass} onClick={() => runExponential("cdf")}>P(X≤x)</button>
+                <button type="button" className={btnClass} onClick={() => runExponential("mean")}>E[X]</button>
+                <button type="button" className={`${btnClass} col-span-2`} onClick={() => runExponential("variance")}>Var[X]</button>
+              </div>
+            </>
+          )}
           <ResultPanel result={distributionResult} isLoading={distributionLoading} />
+        </div>
+      )}
+
+      {subMode === "correlation" && (
+        <div className="space-y-3">
+          <label className="block text-sm text-muted">
+            X (separados por coma)
+            <input
+              value={xRaw}
+              onChange={(e) => setXRaw(e.target.value)}
+              placeholder="1, 2, 3, 4"
+              className={`${inputClass} mt-1`}
+            />
+          </label>
+          <label className="block text-sm text-muted">
+            Y (separados por coma)
+            <input
+              value={yRaw}
+              onChange={(e) => setYRaw(e.target.value)}
+              placeholder="3, 5, 7, 9"
+              className={`${inputClass} mt-1`}
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-1.5">
+            <button type="button" className={btnClass} onClick={() => runCorrelation("correlation")}>r</button>
+            <button type="button" className={btnClass} onClick={() => runCorrelation("slope")}>Pendiente</button>
+            <button type="button" className={btnClass} onClick={() => runCorrelation("intercept")}>Intercepto</button>
+          </div>
+          <ResultPanel result={correlationResult} isLoading={correlationLoading} />
         </div>
       )}
     </div>

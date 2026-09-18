@@ -12,7 +12,16 @@ import sympy
 from fastapi import APIRouter, Request
 
 from app.core.logging import log_request_event
-from app.schemas.requests import BinomialRequest, CombinatoricsRequest, NormalRequest, StatisticsDescriptiveRequest
+from app.schemas.requests import (
+    BinomialRequest,
+    CombinatoricsRequest,
+    ExponentialRequest,
+    NormalRequest,
+    PoissonRequest,
+    StatisticsCorrelationRequest,
+    StatisticsDescriptiveRequest,
+    UniformRequest,
+)
 from app.schemas.responses import ErrorCode, MathResponse, OperationType, ResultType
 from app.services import stats_service
 
@@ -56,10 +65,27 @@ def _scalar_response(
 async def statistics_descriptive(payload: StatisticsDescriptiveRequest, request: Request) -> MathResponse:
     log_request_event(request.state.request_id, "statistics_descriptive_request")
     try:
-        result = stats_service.descriptive_stat(payload.values, payload.stat, payload.variance_kind)
+        result = stats_service.descriptive_stat(payload.values, payload.stat, payload.variance_kind, payload.percentile_p)
     except ValueError as exc:
         return _error(request, OperationType.STATISTICS_DESCRIPTIVE, str(exc))
     return _scalar_response(request, OperationType.STATISTICS_DESCRIPTIVE, result)
+
+
+@router.post("/statistics/correlation", response_model=MathResponse)
+async def statistics_correlation(payload: StatisticsCorrelationRequest, request: Request) -> MathResponse:
+    """Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md,
+    sección 6.2)."""
+    log_request_event(request.state.request_id, "statistics_correlation_request")
+    try:
+        if payload.query == "correlation":
+            result = stats_service.linear_correlation(payload.x, payload.y)
+        elif payload.query == "slope":
+            result = stats_service.linear_regression_slope(payload.x, payload.y)
+        else:
+            result = stats_service.linear_regression_intercept(payload.x, payload.y)
+    except ValueError as exc:
+        return _error(request, OperationType.STATISTICS_CORRELATION, str(exc))
+    return _scalar_response(request, OperationType.STATISTICS_CORRELATION, result)
 
 
 @router.post("/statistics/combinatorics", response_model=MathResponse)
@@ -104,3 +130,51 @@ async def statistics_normal(payload: NormalRequest, request: Request) -> MathRes
     except ValueError as exc:
         return _error(request, OperationType.STATISTICS_NORMAL, str(exc))
     return _scalar_response(request, OperationType.STATISTICS_NORMAL, result)
+
+
+@router.post("/statistics/poisson", response_model=MathResponse)
+async def statistics_poisson(payload: PoissonRequest, request: Request) -> MathResponse:
+    """Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7)."""
+    log_request_event(request.state.request_id, "statistics_poisson_request")
+    try:
+        if payload.query == "pmf":
+            result = stats_service.poisson_pmf(payload.lam, payload.k)
+        elif payload.query == "cdf":
+            result = stats_service.poisson_cdf(payload.lam, payload.k)
+        elif payload.query == "mean":
+            result = stats_service.poisson_expected_value(payload.lam)
+        else:
+            result = stats_service.poisson_variance(payload.lam)
+    except ValueError as exc:
+        return _error(request, OperationType.STATISTICS_POISSON, str(exc))
+    return _scalar_response(request, OperationType.STATISTICS_POISSON, result)
+
+
+@router.post("/statistics/uniform", response_model=MathResponse)
+async def statistics_uniform(payload: UniformRequest, request: Request) -> MathResponse:
+    log_request_event(request.state.request_id, "statistics_uniform_request")
+    try:
+        if payload.query == "cdf":
+            result = stats_service.uniform_cdf(payload.a, payload.b, payload.x)
+        elif payload.query == "mean":
+            result = stats_service.uniform_expected_value(payload.a, payload.b)
+        else:
+            result = stats_service.uniform_variance(payload.a, payload.b)
+    except ValueError as exc:
+        return _error(request, OperationType.STATISTICS_UNIFORM, str(exc))
+    return _scalar_response(request, OperationType.STATISTICS_UNIFORM, result)
+
+
+@router.post("/statistics/exponential", response_model=MathResponse)
+async def statistics_exponential(payload: ExponentialRequest, request: Request) -> MathResponse:
+    log_request_event(request.state.request_id, "statistics_exponential_request")
+    try:
+        if payload.query == "cdf":
+            result = stats_service.exponential_cdf(payload.lam, payload.x)
+        elif payload.query == "mean":
+            result = stats_service.exponential_expected_value(payload.lam)
+        else:
+            result = stats_service.exponential_variance(payload.lam)
+    except ValueError as exc:
+        return _error(request, OperationType.STATISTICS_EXPONENTIAL, str(exc))
+    return _scalar_response(request, OperationType.STATISTICS_EXPONENTIAL, result)

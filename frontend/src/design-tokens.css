@@ -301,3 +301,130 @@
 [data-theme="high-contrast-blue"] * {
   border-width: 2px !important;
 }
+
+/**
+ * Fase Q, Módulo Q0 — Densidad de interfaz.
+ *
+ * Dos niveles: "comfortable" (default — comportamiento actual, SIN
+ * cambios, para que la regresión pedida por el spec sea trivial) y
+ * "compact". Mecanismo elegido para cumplir "vía variables de
+ * design-tokens.css, sin lógica condicional dispersa por componente":
+ * casi todo el espaciado/tamaño de tecla/texto del proyecto usa clases
+ * de Tailwind en unidades `rem` (p-4, gap-3, text-sm, etc.), y `rem` se
+ * calcula siempre contra el font-size del elemento <html>. Escalar ESE
+ * único valor reescala TODO lo que ya está en rem — padding, gap, ancho/
+ * alto de teclas, tamaño de texto — sin tocar un solo componente.
+ *
+ * Riesgo conocido, no verificable sin ejecución real (ver Cierre del
+ * Módulo Q0): cualquier elemento con tamaño fijo en `px` (no `rem`) o con
+ * su propio sistema de fuentes (MathLive/KaTeX puede no heredar
+ * font-size del documento en todos los casos) podría no escalar junto
+ * con el resto — a confirmar visualmente.
+ */
+:root,
+[data-density="comfortable"] {
+  font-size: 100%;
+}
+
+[data-density="compact"] {
+  font-size: 87.5%;
+}
+
+/**
+ * Fase R, Módulo R0 — Accesibilidad tipográfica.
+ *
+ * Escala de tamaño de fuente SOLO para números/resultados/etiquetas de
+ * teclado (independiente de la densidad de Q0, que escala TODO). No se
+ * puede lograr igual que Q0 (reescalar el font-size de <html>) porque
+ * eso volvería a afectar a toda la app, no solo a estos elementos — así
+ * que aquí se usa una variable (`--a11y-text-scale`) que multiplica el
+ * valor rem exacto de cada tamaño base ya en uso (los mismos valores que
+ * ya usaban las clases de Tailwind que reemplazan: text-3xl=1.875rem,
+ * text-base=1rem, text-sm=0.875rem, 11px=0.6875rem) — así que con la
+ * escala en su valor por defecto (1), el resultado es EXACTAMENTE el
+ * mismo tamaño que había antes de este módulo (regresión trivial por
+ * construcción, igual que en Q0).
+ *
+ * Combina sin conflicto con Alto Contraste: ninguno de los selectores de
+ * abajo toca color/borde, solo font-size — y con Q0 (Densidad): al ser
+ * ambos font-size en rem, se multiplican en cascada (rem ya refleja la
+ * densidad; --a11y-text-scale escala ADEMÁS esos elementos puntuales).
+ */
+:root,
+[data-text-size="normal"] {
+  --a11y-text-scale: 1;
+}
+[data-text-size="large"] {
+  --a11y-text-scale: 1.15;
+}
+[data-text-size="xlarge"] {
+  --a11y-text-scale: 1.3;
+}
+
+.a11y-scale-result-3xl {
+  /* Base 1.875rem — tamaño del número principal en precision-lab-lite
+     (ResultPanel.tsx, `text-3xl`). */
+  font-size: calc(1.875rem * var(--a11y-text-scale, 1));
+}
+.a11y-scale-result-lg {
+  /* Base 1.125rem — tamaño del número principal en precision-lab
+     (ResultPanel.tsx, `text-lg`). Divergencia preexistente entre repos,
+     no introducida por este módulo — cada uno escala desde su propio
+     tamaño base actual. */
+  font-size: calc(1.125rem * var(--a11y-text-scale, 1));
+}
+.a11y-key-base {
+  font-size: calc(1rem * var(--a11y-text-scale, 1));
+}
+.a11y-key-sm {
+  font-size: calc(0.875rem * var(--a11y-text-scale, 1));
+}
+.a11y-key-tiny {
+  font-size: calc(0.6875rem * var(--a11y-text-scale, 1));
+}
+
+/**
+ * Tipografía amigable con dislexia — DEDUCIBLE, decisión registrada
+ * aquí (spec sección 4 lo deja explícitamente a criterio del ejecutor):
+ * NO se cambia la familia tipográfica (ej. a "OpenDyslexic") porque (a)
+ * requeriría cargar una fuente externa que no pude verificar que cargue
+ * bien sin acceso a red en este entorno, y (b) la evidencia de que
+ * aumentar el espaciado entre letras/palabras ayuda a la lectura es más
+ * sólida y consistente que la evidencia específica sobre esa fuente en
+ * particular. Se aplica sobre la tipografía del sistema ya usada, en
+ * <html> completo (letter-spacing/word-spacing SÍ heredan correctamente
+ * a través de rem/Tailwind, a diferencia de font-size — no hace falta
+ * ningún ajuste por componente).
+ */
+[data-dyslexia-friendly="true"] {
+  letter-spacing: 0.035em;
+  word-spacing: 0.08em;
+  line-height: 1.6;
+}
+
+/**
+ * Fase S, Módulo S0 — Reducir movimiento.
+ *
+ * A diferencia de Q0/R0 (font-size, que no se puede sobreescribir por
+ * herencia normal), transition/animation SÍ se pueden neutralizar con un
+ * selector universal — así que un único bloque cubre TODA animación
+ * existente HOY (HistoryDrawer.tsx: transition-[width] al abrir/cerrar;
+ * AngleModePopover.tsx: transition-colors/transition-transform del
+ * interruptor DEG/RAD; App.tsx de main: transition-colors del subrayado
+ * de pestaña activa) Y cualquiera que se agregue después, sin volver a
+ * tocar este archivo ni ningún componente. No encontré ninguna
+ * transición en KeyboardPanel.tsx (la apertura del panel de teclado no
+ * está animada con CSS hoy en ninguno de los dos repos) — lo señalo
+ * porque el spec menciona "apertura de panel" como ejemplo; no hay nada
+ * que suavizar ahí específicamente, ver Cierre del Módulo S0.
+ */
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] *::before,
+[data-reduced-motion="true"] *::after {
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}

@@ -83,6 +83,8 @@ export function BasicMode() {
   const setLoading = useUIStore((state) => state.setLoading);
   const setErrorMessage = useUIStore((state) => state.setErrorMessage);
   const isLoading = useUIStore((state) => state.isLoading);
+  const setActiveMode = useUIStore((state) => state.setActiveMode);
+  const setPendingGraphResult = useUIStore((state) => state.setPendingGraphResult);
 
   const systemRows = splitSystemLatex(latex);
 
@@ -215,7 +217,22 @@ export function BasicMode() {
   // completo. Mismos endpoints y misma forma de payload que
   // DerivativeMode.tsx/IntegralMode.tsx.
   async function submitCalculus(intent: CalculusIntent): Promise<void> {
-    const trimmedInner = latexToBackendSyntax(intent.innerLatex);
+    // Fase E: "ode" no tiene innerLatex (no hay envoltura que
+    // desenvolver, ver calculusIntent.ts) -- usa cleanedExpression.
+    // NIVEL DE EVIDENCIA 2 para la conversión de la prima (') a través de
+    // convertLatexToAsciiMath: sin mathlive real instalado en este
+    // entorno (mismo bloqueo de red ya documentado para sinh^{-1}/° en
+    // este archivo) no se pudo confirmar con ejecución real que la
+    // librería preserva "'" sin alterarlo. Se asume que sí (mismo
+    // criterio ya aceptado para ° y las plantillas \frac{d}{dx} etc. de
+    // este mismo módulo) -- riesgo declarado, no una certeza verificada.
+    const rawInner =
+      intent.kind === "ode"
+        ? intent.cleanedExpression
+        : intent.kind === "residue" || intent.kind === "singularities"
+          ? intent.expressionLatex
+          : intent.innerLatex;
+    const trimmedInner = latexToBackendSyntax(rawInner);
     if (!trimmedInner) {
       setValidationError("La expresión no puede estar vacía.");
       return;
@@ -244,15 +261,29 @@ export function BasicMode() {
                 },
                 `∫ ${trimmedInner}`,
               )
-            : await submitAndRecord(
-                "/limit",
-                // Corrección post-auditoría: calculusIntent.ts ahora
-                // reconoce la notación lateral con un escáner propio (ver
-                // detectLateralLimit) en vez de depender de Compute Engine
-                // — intent.direction ya trae "left"/"right" cuando aplica.
-                { expression: trimmedInner, variable: intent.variable, point: intent.point, direction: intent.direction },
-                `lim[${intent.variable}->${intent.point}] ${trimmedInner}`,
-              );
+            : intent.kind === "limit"
+              ? await submitAndRecord(
+                  "/limit",
+                  // Corrección post-auditoría: calculusIntent.ts ahora
+                  // reconoce la notación lateral con un escáner propio (ver
+                  // detectLateralLimit) en vez de depender de Compute Engine
+                  // — intent.direction ya trae "left"/"right" cuando aplica.
+                  { expression: trimmedInner, variable: intent.variable, point: intent.point, direction: intent.direction },
+                  `lim[${intent.variable}->${intent.point}] ${trimmedInner}`,
+                )
+              : intent.kind === "ode"
+                ? await submitAndRecord("/ode", { expression: trimmedInner }, trimmedInner)
+                : intent.kind === "residue"
+                  ? await submitAndRecord(
+                      "/complex/residue",
+                      { expression: trimmedInner, point: latexToBackendSyntax(intent.pointLatex) },
+                      `Res(${trimmedInner}, z=${intent.pointLatex})`,
+                    )
+                  : await submitAndRecord(
+                      "/complex/singularities",
+                      { expression: trimmedInner },
+                      `Sing(${trimmedInner})`,
+                    );
       setLastResult(result);
       if (!result.success) {
         setErrorMessage(result.error_message ?? "Ocurrió un error.");
@@ -355,6 +386,39 @@ export function BasicMode() {
     formRef.current?.requestSubmit();
   }
 
+  // Fase F (spec_edo_complejos_tooltips.md §3.4, Módulo F3): "Graficar"
+  // toma el campo TAL CUAL está (se espera que el usuario ya haya
+  // evaluado o escrito directamente un número complejo concreto, ej.
+  // "3+4i" -- graph_service.graph_complex_point rechaza con DOMAIN_ERROR
+  // si todavía tiene variables libres) y lo manda al endpoint dedicado.
+  // Reutiliza el mismo "puente" (pendingGraphResult, useUIStore.ts) que
+  // consume Graph2DForm en GraphMode.tsx.
+  async function handleGraphComplex(): Promise<void> {
+    const trimmed = latexToBackendSyntax(latex);
+    if (!trimmed) {
+      setValidationError("El campo no puede estar vacío.");
+      return;
+    }
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const result = await submitAndRecord(
+        "/graph/complex_point",
+        { expression: trimmed },
+        `Graficar(${trimmed})`,
+      );
+      if (!result.success) {
+        setLastResult(result);
+        setErrorMessage(result.error_message ?? "Ocurrió un error.");
+        return;
+      }
+      setPendingGraphResult(result);
+      setActiveMode("graph");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Módulo 0 (paridad con precision-lab-lite): el teclado fijo de
   // columna 2 desaparece — NaturalMathKeyboard ya no se renderiza inline
   // aquí, se registra en el store compartido para que <KeyboardDock>
@@ -392,6 +456,7 @@ export function BasicMode() {
         onSolveEquation={handleSolveEquation}
         onSolveSystem={handleSolveSystem}
         onSimplify={handleSimplify}
+        onGraphComplex={handleGraphComplex}
         showCalculusStrip
         hideCoreGrid
       />,

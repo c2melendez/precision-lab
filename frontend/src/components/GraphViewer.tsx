@@ -31,7 +31,13 @@ interface PlotlyModule {
 // Fase D (spec UX estilo ClassCalc §6): colores explícitos por curva, en
 // vez del ciclo de color por defecto de Plotly — para que coincidan con
 // los puntos de color del sidebar de expresiones en GraphMode.tsx.
-export const CURVE_COLORS = ["#E8A33D", "#3E7C74", "#9B7FD6", "#D97757", "#5B94C9"];
+// Fase T, Módulo T0: este archivo ya no declara su propia copia de
+// CURVE_COLORS — nada la importaba desde aquí (verificado antes de
+// quitarla), y la fuente única ahora es useGraphColorPaletteStore.ts,
+// que no depende de este archivo ni de Plotly, así que no reintroduce
+// el problema de bundle eager que motivó la duplicación original. El
+// color de cada curva sigue llegando por el prop `colors` de
+// `<GraphViewer>`, sin cambios en ese contrato.
 
 function traceToPlotly(trace: GraphData["traces"][number], color?: string) {
   if (trace.type === "surface") {
@@ -43,6 +49,21 @@ function traceToPlotly(trace: GraphData["traces"][number], color?: string) {
       name: trace.name,
       colorscale: "Viridis" as const,
       showscale: false,
+    };
+  }
+  // Fase F (spec_edo_complejos_tooltips.md §3.4, Módulo F3): "point"
+  // (Argand) -- mismo type "scatter" que una curva, pero mode:"markers"
+  // en vez de "lines" (Plotly lo soporta nativamente, sin dependencia
+  // nueva, tal como preveía el spec). NO reutiliza mode:"lines" con un
+  // solo punto -- eso conecta con nada y Plotly lo dibuja invisible.
+  if (trace.type === "point") {
+    return {
+      x: trace.x,
+      y: trace.y,
+      type: "scatter" as const,
+      mode: "markers" as const,
+      name: trace.name,
+      marker: color ? { color, size: 10 } : { size: 10 },
     };
   }
   return {

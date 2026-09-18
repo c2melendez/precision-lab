@@ -20,6 +20,7 @@ from app.core.logging import log_request_event
 from app.schemas.requests import (
     Graph3DRequest,
     GraphParametricRequest,
+    GraphPolarRequest,
     ImplicitDerivativeRequest,
     ImproperIntegralRequest,
     InequalityRequest,
@@ -331,6 +332,33 @@ async def graph_parametric(payload: GraphParametricRequest, request: Request) ->
     return MathResponse(
         success=True,
         operation=OperationType.GRAPH_PARAMETRIC,
+        request_id=request.state.request_id,
+        result_type=ResultType.GRAPH,
+        graph_data=result.graph_data,
+        has_detailed_steps=False,
+        warnings=result.warnings,
+        duration_ms=_duration_ms(request),
+    )
+
+
+@router.post("/graph/polar", response_model=MathResponse)
+async def graph_polar(payload: GraphPolarRequest, request: Request) -> MathResponse:
+    log_request_event(request.state.request_id, "graph_polar_request")
+
+    try:
+        result = graph_service.compute_graph_polar(
+            payload.r_expression, payload.variable, payload.theta_min, payload.theta_max
+        )
+    except parsing.ParseSecurityError as exc:
+        return _error(request, OperationType.GRAPH_POLAR, ErrorCode.PARSE_ERROR, str(exc))
+    except ComplexityLimitError as exc:
+        return _error(request, OperationType.GRAPH_POLAR, ErrorCode.COMPLEXITY_LIMIT, str(exc))
+    except graph_service.InvalidVariableError as exc:
+        return _error(request, OperationType.GRAPH_POLAR, ErrorCode.INVALID_VARIABLE, str(exc))
+
+    return MathResponse(
+        success=True,
+        operation=OperationType.GRAPH_POLAR,
         request_id=request.state.request_id,
         result_type=ResultType.GRAPH,
         graph_data=result.graph_data,

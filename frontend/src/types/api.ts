@@ -286,6 +286,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matrix/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Matrix Trace
+         * @description Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md,
+         *     sección 5) — mismo patrón que /matrix/norm: escalar de una sola
+         *     matriz.
+         */
+        post: operations["matrix_trace_api_v1_matrix_trace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matrix/rank": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Matrix Rank
+         * @description Módulo L0 — rango expuesto como operación con resultado visible;
+         *     reutiliza Matrix.rank() de SymPy (el mismo cálculo interno de la
+         *     clasificación de sistemas de Fase B, sin tocar esa lógica ni
+         *     duplicarla).
+         */
+        post: operations["matrix_rank_api_v1_matrix_rank_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/matrix/eigen": {
         parameters: {
             query?: never;
@@ -472,6 +517,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/graph/polar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Graph Polar */
+        post: operations["graph_polar_api_v1_graph_polar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/derivative/partial": {
         parameters: {
             query?: never;
@@ -523,6 +585,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/statistics/correlation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Statistics Correlation
+         * @description Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md,
+         *     sección 6.2).
+         */
+        post: operations["statistics_correlation_api_v1_statistics_correlation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/statistics/combinatorics": {
         parameters: {
             query?: never;
@@ -568,6 +651,60 @@ export interface paths {
         put?: never;
         /** Statistics Normal */
         post: operations["statistics_normal_api_v1_statistics_normal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/statistics/poisson": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Statistics Poisson
+         * @description Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7).
+         */
+        post: operations["statistics_poisson_api_v1_statistics_poisson_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/statistics/uniform": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Statistics Uniform */
+        post: operations["statistics_uniform_api_v1_statistics_uniform_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/statistics/exponential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Statistics Exponential */
+        post: operations["statistics_exponential_api_v1_statistics_exponential_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -655,7 +792,7 @@ export interface components {
          *       INTERNAL_ERROR         500  excepción no esperada / error de red en el cliente
          * @enum {string}
          */
-        ErrorCode: "PARSE_ERROR" | "VALIDATION_ERROR" | "TIMEOUT" | "COMPLEXITY_LIMIT" | "SINGULAR_MATRIX" | "DIMENSION_MISMATCH" | "DOMAIN_ERROR" | "AMBIGUOUS_VARIABLE" | "INVALID_VARIABLE" | "UNSUPPORTED_IN_PHASE_1" | "INTERNAL_ERROR";
+        ErrorCode: "PARSE_ERROR" | "VALIDATION_ERROR" | "TIMEOUT" | "COMPLEXITY_LIMIT" | "SINGULAR_MATRIX" | "DIMENSION_MISMATCH" | "DOMAIN_ERROR" | "AMBIGUOUS_VARIABLE" | "INVALID_VARIABLE" | "UNSUPPORTED_IN_PHASE_1" | "UNSUPPORTED_OPERATION" | "INTERNAL_ERROR";
         /** EvaluateRequest */
         EvaluateRequest: {
             /** Expression */
@@ -670,6 +807,24 @@ export interface components {
             substitutions?: {
                 [key: string]: string;
             } | null;
+        };
+        /** ExponentialRequest */
+        ExponentialRequest: {
+            /**
+             * Lam
+             * @default 1
+             */
+            lam: number;
+            /**
+             * X
+             * @default 0
+             */
+            x: number;
+            /**
+             * Query
+             * @enum {string}
+             */
+            query: "cdf" | "mean" | "variance";
         };
         /** ExpressionRequest */
         ExpressionRequest: {
@@ -765,6 +920,10 @@ export interface components {
             points_truncated: boolean;
             /** Analysis */
             analysis?: components["schemas"]["GraphAnalysis"][] | null;
+            /** X Axis Label (Fase F, Módulo F3 -- parche manual, ver cabecera del archivo) */
+            x_axis_label?: string | null;
+            /** Y Axis Label (Fase F, Módulo F3 -- parche manual, ver cabecera del archivo) */
+            y_axis_label?: string | null;
         };
         /** GraphParametricRequest */
         GraphParametricRequest: {
@@ -787,6 +946,32 @@ export interface components {
              * @default 6.283185307179586
              */
             t_max: number;
+        };
+        /**
+         * GraphPolarRequest
+         * @description Módulo I0 (Fase I): gráfica polar r=f(θ). Mismo patrón de campos
+         *     que GraphParametricRequest — rango de θ expuesto y editable, con el
+         *     mismo default de una vuelta completa (DEDUCIBLE, sección 2 del spec:
+         *     "mismo patrón que el rango de t ya usado en paramétricas").
+         */
+        GraphPolarRequest: {
+            /** R Expression */
+            r_expression: string;
+            /**
+             * Variable
+             * @default theta
+             */
+            variable: string;
+            /**
+             * Theta Min
+             * @default 0
+             */
+            theta_min: number;
+            /**
+             * Theta Max
+             * @default 6.283185307179586
+             */
+            theta_max: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -984,7 +1169,7 @@ export interface components {
          * OperationType
          * @enum {string}
          */
-        OperationType: "evaluate" | "simplify" | "factor" | "expand" | "solve" | "derivative" | "integral" | "matrix_operation" | "matrix_determinant" | "matrix_inverse" | "graph_2d" | "solve_system" | "inequality" | "limit" | "series" | "matrix_eigen" | "integral_improper" | "graph_3d" | "graph_parametric" | "derivative_partial" | "derivative_implicit" | "matrix_transpose" | "matrix_power" | "matrix_ref" | "matrix_rref" | "matrix_norm" | "statistics_descriptive" | "statistics_combinatorics" | "statistics_binomial" | "statistics_normal" | "inequality_system";
+        OperationType: "evaluate" | "simplify" | "factor" | "expand" | "solve" | "derivative" | "integral" | "matrix_operation" | "matrix_determinant" | "matrix_inverse" | "graph_2d" | "solve_system" | "inequality" | "limit" | "series" | "matrix_eigen" | "integral_improper" | "graph_3d" | "graph_parametric" | "derivative_partial" | "derivative_implicit" | "matrix_transpose" | "matrix_power" | "matrix_ref" | "matrix_rref" | "matrix_norm" | "matrix_trace" | "matrix_rank" | "statistics_correlation" | "statistics_descriptive" | "statistics_combinatorics" | "statistics_binomial" | "statistics_normal" | "statistics_poisson" | "statistics_uniform" | "statistics_exponential" | "inequality_system" | "graph_polar" | "ode" | "complex_residue" | "complex_singularities";
         /** PartialDerivativeRequest */
         PartialDerivativeRequest: {
             /** Expression */
@@ -997,11 +1182,29 @@ export interface components {
              */
             order: number;
         };
+        /** PoissonRequest */
+        PoissonRequest: {
+            /**
+             * Lam
+             * @default 1
+             */
+            lam: number;
+            /**
+             * K
+             * @default 0
+             */
+            k: number;
+            /**
+             * Query
+             * @enum {string}
+             */
+            query: "pmf" | "cdf" | "mean" | "variance";
+        };
         /**
          * ResultType
          * @enum {string}
          */
-        ResultType: "scalar" | "equation_solutions" | "matrix" | "boolean" | "graph" | "identity" | "contradiction" | "inequality_region";
+        ResultType: "scalar" | "equation_solutions" | "matrix" | "boolean" | "graph" | "identity" | "contradiction" | "inequality_region" | "ode_solution" | "complex_residue" | "complex_singularities";
         /** SeriesRequest */
         SeriesRequest: {
             /** Expression */
@@ -1042,6 +1245,23 @@ export interface components {
             /** Variables */
             variables: string[];
         };
+        /**
+         * StatisticsCorrelationRequest
+         * @description Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md,
+         *     sección 6.2): pares (x,y), no una sola lista — request separado de
+         *     StatisticsDescriptiveRequest en vez de forzarlo en el mismo schema.
+         */
+        StatisticsCorrelationRequest: {
+            /** X */
+            x: number[];
+            /** Y */
+            y: number[];
+            /**
+             * Query
+             * @enum {string}
+             */
+            query: "correlation" | "slope" | "intercept";
+        };
         /** StatisticsDescriptiveRequest */
         StatisticsDescriptiveRequest: {
             /** Values */
@@ -1050,13 +1270,15 @@ export interface components {
              * Stat
              * @enum {string}
              */
-            stat: "mean" | "median" | "mode" | "sum" | "sumsq" | "n" | "min" | "max" | "range" | "mad" | "variance" | "stdev";
+            stat: "mean" | "median" | "mode" | "sum" | "sumsq" | "n" | "min" | "max" | "range" | "mad" | "variance" | "stdev" | "q1" | "q2" | "q3" | "iqr" | "percentile";
             /**
              * Variance Kind
              * @default population
              * @enum {string}
              */
             variance_kind: "population" | "sample";
+            /** Percentile P */
+            percentile_p?: number | null;
         };
         /** Step */
         Step: {
@@ -1085,6 +1307,29 @@ export interface components {
             y: (number | null)[];
             /** Z */
             z?: number[][] | null;
+        };
+        /** UniformRequest */
+        UniformRequest: {
+            /**
+             * A
+             * @default 0
+             */
+            a: number;
+            /**
+             * B
+             * @default 1
+             */
+            b: number;
+            /**
+             * X
+             * @default 0
+             */
+            x: number;
+            /**
+             * Query
+             * @enum {string}
+             */
+            query: "cdf" | "mean" | "variance";
         };
         /** ValidationError */
         ValidationError: {
@@ -1625,6 +1870,72 @@ export interface operations {
             };
         };
     };
+    matrix_trace_api_v1_matrix_trace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixSingleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    matrix_rank_api_v1_matrix_rank_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixSingleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     matrix_eigen_api_v1_matrix_eigen_post: {
         parameters: {
             query?: never;
@@ -1955,6 +2266,39 @@ export interface operations {
             };
         };
     };
+    graph_polar_api_v1_graph_polar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GraphPolarRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     derivative_partial_api_v1_derivative_partial_post: {
         parameters: {
             query?: never;
@@ -2054,6 +2398,39 @@ export interface operations {
             };
         };
     };
+    statistics_correlation_api_v1_statistics_correlation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatisticsCorrelationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     statistics_combinatorics_api_v1_statistics_combinatorics_post: {
         parameters: {
             query?: never;
@@ -2130,6 +2507,105 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["NormalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statistics_poisson_api_v1_statistics_poisson_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PoissonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statistics_uniform_api_v1_statistics_uniform_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UniformRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MathResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    statistics_exponential_api_v1_statistics_exponential_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExponentialRequest"];
             };
         };
         responses: {

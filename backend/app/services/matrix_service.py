@@ -824,3 +824,45 @@ def norm(matrix: sympy.Matrix) -> ScalarStepResult:
         ),
     ]
     return ScalarStepResult(value, steps, True, [])
+
+
+def trace(matrix: sympy.Matrix) -> ScalarStepResult:
+    """Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md,
+    sección 5): traza — suma de la diagonal principal. Cálculo trivial,
+    sin dependencias nuevas; mismo patrón ScalarStepResult que
+    determinant/norm/dot, no un tipo de resultado nuevo."""
+    if matrix.rows != matrix.cols:
+        raise DimensionMismatchError(
+            f"La traza solo está definida para matrices cuadradas; recibida {matrix.shape}."
+        )
+    diagonal = [matrix[i, i] for i in range(matrix.rows)]
+    value = sympy.simplify(sum(diagonal))
+    step = Step(
+        index=0,
+        title="Traza",
+        description="Suma de los elementos de la diagonal principal.",
+        rule="Trace",
+        latex_before=" + ".join(sympy.latex(d) for d in diagonal),
+        latex_after=sympy.latex(value),
+    )
+    return ScalarStepResult(value, [step], True, [])
+
+
+def rank(matrix: sympy.Matrix) -> ScalarStepResult:
+    """Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md,
+    sección 5): rango, expuesto como operación con resultado visible —
+    reutiliza `Matrix.rank()` de SymPy, el mismo cálculo que ya se usa
+    internamente en `_verify_...`/clasificación de sistemas (Fase B de
+    spec_motor_matematico_pendiente.md), sin duplicar esa lógica ni
+    tocarla — este es un wrapper nuevo, no una modificación de la
+    existente."""
+    value = sympy.Integer(matrix.rank())
+    step = Step(
+        index=0,
+        title="Rango",
+        description="Número de filas (o columnas) linealmente independientes — calculado por eliminación gaussiana.",
+        rule="Rank",
+        latex_before=sympy.latex(matrix),
+        latex_after=sympy.latex(value),
+    )
+    return ScalarStepResult(value, [step], True, [])

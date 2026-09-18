@@ -1,4 +1,6 @@
 import { useKeyboardPanelStore } from "../store/useKeyboardPanelStore";
+import { useLayoutModeStore } from "../store/useLayoutModeStore";
+import { useMinWidthMediaQuery, FLOATING_MIN_WIDTH_PX } from "../hooks/useMinWidthMediaQuery";
 import { KeyboardPanel } from "./KeyboardPanel";
 
 /**
@@ -20,6 +22,52 @@ import { KeyboardPanel } from "./KeyboardPanel";
  * "Expandir" queda habilitado si hay basicContent O content — antes del
  * Módulo 1 solo dependía de `content` (categorías), pero ahora en móvil
  * también hace falta para llegar al grid básico.
+ *
+ * Fase P (Rediseño visual, Módulo P2 — spec_rediseno_visual.md sección 3,
+ * fila "Enfoque"): en layoutMode "focus" se fuerza el mismo criterio de
+ * "dock reducido a lo esencial" que ya existe para móvil, pero en
+ * CUALQUIER breakpoint (dt/laptop/tablet incluidos) — para maximizar el
+ * área de resultado/gráfica. Esto implica también que el grid básico
+ * completo, que en breakpoints ≥md normalmente vive directamente en el
+ * dock (visible sin abrir el panel), en Focus deja de estar ahí — así
+ * que debe volver a aparecer dentro de KeyboardPanel en TODOS los
+ * breakpoints en Focus (no solo <768px como hoy), o los dígitos
+ * quedarían inalcanzables en desktop bajo Focus — violaría la
+ * restricción dura de dock siempre alcanzable.
+ * Fase P, Módulo P3 ("Apilado"): la spec exige que ahí el teclado quede
+ * "colapsado dentro del mismo flujo, NO overlay/bottom sheet" — lo
+ * opuesto a como funciona este componente (siempre `fixed`, incluso
+ * `KeyboardPanel.tsx` es `fixed inset-x-0 bottom-0` en todo breakpoint).
+ * Para no tocar `KeyboardPanel.tsx`/`CATEGORY_MENUS` (zona de fricción
+ * marcada con Track A, mapa de coordinación sección 3.4), Apilado NO usa
+ * este dock ni ese panel: `Screen.tsx`/`CalculatorScreen.tsx` renderizan
+ * su propia sección inline colapsable, leyendo el mismo
+ * `useKeyboardPanelStore` directamente. Por eso este componente
+ * simplemente no se renderiza cuando `layoutMode === "stacked"` — evita
+ * tener dos UIs de teclado a la vez.
+ * Fase P, Módulo P3 ("Apilado"): la spec exige que ahí el teclado quede
+ * "colapsado dentro del mismo flujo, NO overlay/bottom sheet" — lo
+ * opuesto a como funciona este componente (siempre `fixed`, incluso
+ * `KeyboardPanel.tsx` es `fixed inset-x-0 bottom-0` en todo breakpoint).
+ * Para no tocar `KeyboardPanel.tsx`/`CATEGORY_MENUS` (zona de fricción
+ * marcada con Track A, mapa de coordinación sección 3.4), Apilado NO usa
+ * este dock ni ese panel: `Screen.tsx`/`CalculatorScreen.tsx` renderizan
+ * su propia sección inline colapsable, leyendo el mismo
+ * `useKeyboardPanelStore` directamente. Por eso este componente
+ * simplemente no se renderiza cuando `layoutMode === "stacked"` — evita
+ * tener dos UIs de teclado a la vez.
+ *
+ * Fase P, Módulo P4 ("Flotante"): mismo criterio — cuando Flotante está
+ * REALMENTE activo (viewport ≥ 1024px, ver useMinWidthMediaQuery.ts), el
+ * teclado vive dentro de un <FloatingWindow> que renderiza
+ * Screen.tsx/CalculatorScreen.tsx, así que este dock tampoco se monta
+ * ahí. Pero Flotante degrada a Enfoque por debajo de 1024px (P0) — en
+ * ese caso este dock SÍ debe montarse y comportarse exactamente como en
+ * Enfoque (fila compacta forzada), o el teclado quedaría inalcanzable
+ * en tablet/móvil bajo Flotante. Por eso el gating usa el MISMO hook
+ * (`useMinWidthMediaQuery`) que usa el componente de contenido — si cada
+ * uno tuviera su propia detección de breakpoint podrían desincronizarse
+ * por un frame.
  */
 
 export function KeyboardDock() {
@@ -29,6 +77,22 @@ export function KeyboardDock() {
   const compactActions = useKeyboardPanelStore((s) => s.compactActions);
   const toggle = useKeyboardPanelStore((s) => s.toggle);
   const close = useKeyboardPanelStore((s) => s.close);
+  const layoutMode = useLayoutModeStore((s) => s.layoutMode);
+  const isFloatingWideEnough = useMinWidthMediaQuery(FLOATING_MIN_WIDTH_PX);
+
+  // Módulo P3: Apilado maneja su propia sección de teclado inline (ver
+  // comentario de cabecera) — este dock fijo se retira por completo.
+  if (layoutMode === "stacked") return null;
+
+  // Módulo P4: Flotante realmente activo (viewport ancho) — el teclado
+  // vive en su propia FloatingWindow, este dock no se monta.
+  if (layoutMode === "floating" && isFloatingWideEnough) return null;
+
+  // Módulo P2: en Enfoque, la fila compacta reemplaza al grid completo
+  // en TODO breakpoint, no solo en móvil. Módulo P4: Flotante degradado
+  // (viewport angosto) se comporta EXACTAMENTE igual que Enfoque — ver
+  // comentario de cabecera.
+  const forceCompactDock = layoutMode === "focus" || (layoutMode === "floating" && !isFloatingWideEnough);
 
   const hasAdvancedContent = content !== null;
   const hasBasicContent = basicContent !== null;
@@ -38,23 +102,26 @@ export function KeyboardDock() {
     <>
       {(content || basicContent) && (
         <KeyboardPanel isOpen={isOpen} onClose={close}>
-          {/* Grid básico completo — visible SOLO en móvil dentro del
-              panel (en tablet+ ya está en el dock, se ocultaría
-              duplicado). */}
-          {basicContent && <div className="mb-3 md:hidden">{basicContent}</div>}
+          {/* Grid básico completo — visible en móvil SIEMPRE, y en
+              cualquier breakpoint cuando layoutMode es "focus" (Módulo
+              P2): ahí el dock no lo muestra directamente, así que debe
+              seguir siendo alcanzable aquí dentro. */}
+          {basicContent && <div className={forceCompactDock ? "mb-3" : "mb-3 md:hidden"}>{basicContent}</div>}
           {content}
         </KeyboardPanel>
       )}
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-chrome-soft bg-chrome px-3 pb-[env(safe-area-inset-bottom)] pt-2">
         {basicContent ? (
-          <div className="mx-auto hidden max-w-md md:block">{basicContent}</div>
+          <div className={forceCompactDock ? "hidden" : "mx-auto hidden max-w-md md:block"}>{basicContent}</div>
         ) : (
-          <div className="hidden py-2 text-center text-xs text-bone/40 md:block">Sin teclado en este modo</div>
+          <div className={forceCompactDock ? "hidden" : "hidden py-2 text-center text-xs text-bone/40 md:block"}>
+            Sin teclado en este modo
+          </div>
         )}
 
-        {/* Fila compacta — solo móvil (<768px). */}
-        <div className="grid grid-cols-3 gap-1.5 md:hidden">
+        {/* Fila compacta — móvil siempre, y cualquier breakpoint en Focus. */}
+        <div className={forceCompactDock ? "grid grid-cols-3 gap-1.5" : "grid grid-cols-3 gap-1.5 md:hidden"}>
           <button
             type="button"
             onClick={() => compactActions?.onEnter()}
@@ -97,9 +164,9 @@ export function KeyboardDock() {
           </button>
         </div>
 
-        {/* Botón "Más funciones" — solo tablet+ (en móvil ese rol lo
-            cumple "Expandir" de la fila compacta de arriba). */}
-        <div className="mt-1.5 hidden justify-center md:flex">
+        {/* Botón "Más funciones" — tablet+ normalmente; oculto en Focus
+            (ahí "Expandir" de la fila compacta cumple ese rol siempre). */}
+        <div className={forceCompactDock ? "hidden" : "mt-1.5 hidden justify-center md:flex"}>
           <button
             type="button"
             onClick={toggle}

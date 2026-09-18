@@ -21,7 +21,7 @@ from app.core.exception_handlers import (
     validation_exception_handler,
 )
 from app.core.logging import configure_logging
-from app.routers import algebra, calculus, evaluate, graphing, health, matrices, phase2, statistics
+from app.routers import algebra, calculus, complex_analysis, evaluate, graphing, health, matrices, ode, phase2, statistics
 
 configure_logging()
 
@@ -78,3 +78,9 @@ app.include_router(matrices.router, prefix=API_V1_PREFIX)
 app.include_router(graphing.router, prefix=API_V1_PREFIX)
 app.include_router(phase2.router, prefix=API_V1_PREFIX)
 app.include_router(statistics.router, prefix=API_V1_PREFIX)
+# Fase E/F de Track A (spec_edo_complejos_teclado.md) — integrado sobre la
+# base de Track B/C ya en curso, siguiendo el protocolo defensivo del
+# mapa de coordinación (sección 4): estos dos routers son exclusivos de
+# Track A, sin fricción con B/C.
+app.include_router(ode.router, prefix=API_V1_PREFIX)
+app.include_router(complex_analysis.router, prefix=API_V1_PREFIX)

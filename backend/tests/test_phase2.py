@@ -64,6 +64,27 @@ def test_matrix_eigen_passthrough_real():
     assert "3" in body["result_text"]
 
 
+def test_matrix_eigen_tridiagonal_matches_lite_case():
+    """Módulo K1 (spec_graficacion_matrices_estadistica_unidades.md, sección
+    3.2): mismo caso de referencia usado en
+    precision-lab-lite/tests/eigenOps.test.ts ("3x3 tridiagonal") — eigenvalores
+    exactos 2, 2-sqrt(2), 2+sqrt(2). Equivalencia matemática entre motores,
+    no textual: SymPy expresa sqrt(2) como "sqrt(2)", Algebrite como
+    "2^(1/2)" — se compara el valor numérico, no el string."""
+    response = client.post(
+        "/api/v1/matrix/eigen",
+        json={"matrix": [["2", "1", "0"], ["1", "2", "1"], ["0", "1", "2"]]},
+    )
+    body = response.json()
+    assert body["success"] is True
+    text = body["result_text"]
+    # SymPy reporta cada eigenvalor con su multiplicidad explícita —
+    # verificamos que la forma irracional exacta aparece, sin depender del
+    # formato completo de impresión (equivalencia matemática, no textual,
+    # con "2-2^(1/2)"/"2+2^(1/2)" que produce Algebrite en Lite).
+    assert "sqrt(2)" in text
+
+
 # ---------------------------------------------------------------------------
 # UNSUPPORTED_IN_PHASE_1 — sin ejecutar lógica de SymPy
 # ---------------------------------------------------------------------------

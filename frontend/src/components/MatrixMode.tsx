@@ -25,7 +25,9 @@ type Operation =
   | "rref"
   | "dot"
   | "cross"
-  | "norm";
+  | "norm"
+  | "trace"
+  | "rank";
 
 const OPERATION_LABELS: Record<Operation, string> = {
   add: "Suma (A + B)",
@@ -43,6 +45,9 @@ const OPERATION_LABELS: Record<Operation, string> = {
   dot: "Producto punto (A · B)",
   cross: "Producto cruz (A ⨯ B)",
   norm: "Norma / magnitud (‖A‖)",
+  // Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md, sección 5).
+  trace: "Traza (tr A)",
+  rank: "Rango (rango A)",
 };
 
 const NEEDS_MATRIX_B: ReadonlySet<Operation> = new Set(["add", "subtract", "multiply", "kronecker", "dot", "cross"]);
@@ -209,6 +214,10 @@ export function MatrixMode() {
         result = await submitAndRecord("/matrix/rref", { matrix: matrixA }, label);
       } else if (operation === "norm") {
         result = await submitAndRecord("/matrix/norm", { matrix: matrixA }, label);
+      } else if (operation === "trace") {
+        result = await submitAndRecord("/matrix/trace", { matrix: matrixA }, label);
+      } else if (operation === "rank") {
+        result = await submitAndRecord("/matrix/rank", { matrix: matrixA }, label);
       } else if (operation === "power") {
         result = await submitAndRecord(
           "/matrix/power",

@@ -155,6 +155,47 @@ class GraphParametricRequest(BaseModel):
     t_max: float = 6.283185307179586  # 2*pi
 
 
+class ODERequest(BaseModel):
+    """Fase E (spec_edo_complejos_tooltips.md §2.2): la EDO y su condición
+    inicial opcional viajan en el MISMO campo de texto (ej. "y'=2x, y(0)=1"),
+    nunca en un campo aparte -- mismo criterio que el límite lateral."""
+
+    expression: str = Field(..., min_length=1, max_length=500)
+
+
+class ResidueRequest(BaseModel):
+    """Fase F (spec_edo_complejos_tooltips.md §3.2): "z=punto" viaja
+    separado de la expresión (a diferencia de la EDO) porque el teclado
+    monta "Res(□, z=□)" con dos campos editables distintos, no uno solo."""
+
+    expression: str = Field(..., min_length=1, max_length=500)
+    point: str = Field(..., min_length=1, max_length=100)
+
+
+class SingularitiesRequest(BaseModel):
+    expression: str = Field(..., min_length=1, max_length=500)
+
+
+class ComplexPointRequest(BaseModel):
+    """Fase F (spec_edo_complejos_tooltips.md §3.4, Módulo F3): botón
+    "Graficar" -- toma un número complejo YA EVALUADO (texto del campo
+    tal cual, sin variables libres)."""
+
+    expression: str = Field(..., min_length=1, max_length=500)
+
+
+class GraphPolarRequest(BaseModel):
+    """Módulo I0 (Fase I): gráfica polar r=f(θ). Mismo patrón de campos
+    que GraphParametricRequest — rango de θ expuesto y editable, con el
+    mismo default de una vuelta completa (DEDUCIBLE, sección 2 del spec:
+    "mismo patrón que el rango de t ya usado en paramétricas")."""
+
+    r_expression: str
+    variable: str = "theta"
+    theta_min: float = 0
+    theta_max: float = 6.283185307179586  # 2*pi
+
+
 class PartialDerivativeRequest(BaseModel):
     expression: str = Field(..., min_length=1, max_length=500)
     variable: str
@@ -175,8 +216,25 @@ class ImplicitDerivativeRequest(BaseModel):
 
 class StatisticsDescriptiveRequest(BaseModel):
     values: List[float] = Field(..., min_length=1, max_length=200)
-    stat: Literal["mean", "median", "mode", "sum", "sumsq", "n", "min", "max", "range", "mad", "variance", "stdev"]
+    stat: Literal[
+        "mean", "median", "mode", "sum", "sumsq", "n", "min", "max", "range", "mad", "variance", "stdev",
+        # Módulo M0 (spec_graficacion_matrices_estadistica_unidades.md,
+        # sección 6.1).
+        "q1", "q2", "q3", "iqr", "percentile",
+    ]
     variance_kind: Literal["population", "sample"] = "population"
+    # Solo se usa (y es obligatorio) cuando stat == "percentile".
+    percentile_p: float | None = Field(None, ge=0, le=100)
+
+
+class StatisticsCorrelationRequest(BaseModel):
+    """Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md,
+    sección 6.2): pares (x,y), no una sola lista — request separado de
+    StatisticsDescriptiveRequest en vez de forzarlo en el mismo schema."""
+
+    x: List[float] = Field(..., min_length=2, max_length=200)
+    y: List[float] = Field(..., min_length=2, max_length=200)
+    query: Literal["correlation", "slope", "intercept"]
 
 
 class CombinatoricsRequest(BaseModel):
@@ -199,3 +257,24 @@ class NormalRequest(BaseModel):
     a: float = 0
     b: float = 0
     query: Literal["cdf", "range", "zscore"]
+
+
+# Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7):
+# Poisson, uniforme, exponencial — mismo patrón que Binomial/Normal.
+class PoissonRequest(BaseModel):
+    lam: float = Field(1, gt=0)
+    k: int = Field(0, ge=0)
+    query: Literal["pmf", "cdf", "mean", "variance"]
+
+
+class UniformRequest(BaseModel):
+    a: float = 0
+    b: float = 1
+    x: float = 0
+    query: Literal["cdf", "mean", "variance"]
+
+
+class ExponentialRequest(BaseModel):
+    lam: float = Field(1, gt=0)
+    x: float = 0
+    query: Literal["cdf", "mean", "variance"]

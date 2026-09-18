@@ -60,16 +60,35 @@ const ENDPOINT_TO_OPERATION: Record<KnownEndpoint, OperationType | null> = {
   "/integral/improper": "integral_improper",
   "/graph/3d": "graph_3d",
   "/graph/parametric": "graph_parametric",
+  // Módulo I0 (spec_graficacion_matrices_estadistica_unidades.md, Fase I).
+  "/graph/polar": "graph_polar",
   "/derivative/partial": "derivative_partial",
   "/derivative/implicit": "derivative_implicit",
   // P5 (spec v2 §6) — faltaba en el cierre original del Parche 5, mismo
   // motivo que en endpoints.ts.
   "/matrix/norm": "matrix_norm",
+  // Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md, sección 5).
+  "/matrix/trace": "matrix_trace",
+  "/matrix/rank": "matrix_rank",
   // P6 (spec v2 §7)
   "/statistics/descriptive": "statistics_descriptive",
+  // Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md, sección 6.2).
+  "/statistics/correlation": "statistics_correlation",
   "/statistics/combinatorics": "statistics_combinatorics",
   "/statistics/binomial": "statistics_binomial",
+  // Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7).
+  "/statistics/poisson": "statistics_poisson",
+  "/statistics/uniform": "statistics_uniform",
+  "/statistics/exponential": "statistics_exponential",
   "/statistics/normal": "statistics_normal",
+  // Fase E: obligatorio -- Record<KnownEndpoint, ...> exige TODAS las
+  // claves de KNOWN_ENDPOINTS, así que agregar "/ode" ahí sin agregarlo
+  // acá también habría sido un error de compilación (TS2741, propiedad
+  // faltante) -- encontrado con tsc real, no por inspección visual.
+  "/ode": "ode",
+  "/complex/residue": "complex_residue",
+  "/complex/singularities": "complex_singularities",
+  "/graph/complex_point": "graph_2d",
 };
 
 function generateLocalRequestId(): string {

@@ -50,6 +50,7 @@ from sympy import (
     log,
     oo,
     pi,
+    root,
     sec,
     sign,
     sin,
@@ -194,6 +195,16 @@ ALLOWED_FUNCTIONS = {
     # cerrado en Python. Dirección única (rectangular -> polar); no existe
     # sintaxis de entrada polar en este teclado para la dirección inversa.
     "topolar": lambda z: Abs(z) * exp(I * arg(z)),
+    # Fase F (spec_edo_complejos_tooltips.md §3.2, Módulo F0/F1): auditado
+    # con ejecución real (sympy.root) -- maneja z complejo e índices no
+    # enteros correctamente, rama principal (ver hallazgo de F0: root(-8,3)
+    # da la raíz compleja principal, no -2 -- convención estándar, no bug).
+    # Log(z) NO necesita entrada nueva: "log" (arriba) ya es sympy.log
+    # (logaritmo natural con 1 argumento), que para z complejo YA es
+    # ln|z|+i*arg(z) -- confirmado numéricamente en F0, cero cambios
+    # necesarios. zoo (log(0)) ya lo maneja evaluate_service.py existente
+    # (detectado, no un caso nuevo).
+    "root": root,
 }
 ALLOWED_CONSTANTS = {"pi": pi, "e": E, "E": E, "i": I, "I": I, "oo": oo}
 

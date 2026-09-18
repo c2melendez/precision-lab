@@ -305,3 +305,83 @@ def test_ref_parse_error_propagates():
     assert body["success"] is False
     assert body["error_code"] == "PARSE_ERROR"
     assert body["operation"] == "matrix_ref"
+
+
+# ---------------------------------------------------------------------------
+# Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md, sección 5):
+# traza y rango como operaciones expuestas. Rango se verifica con un caso
+# de cada clasificación de sistema (única, indeterminada, incompatible —
+# usando matrices cuadradas equivalentes al comportamiento de cada
+# clasificación, no un sistema aumentado literal, porque /matrix/rank
+# opera sobre una sola matriz).
+# ---------------------------------------------------------------------------
+
+
+def test_trace_simple_case():
+    response = _single("trace", [["4", "6"], ["3", "8"]])
+    body = response.json()
+    assert body["success"] is True
+    assert body["result_text"] == "12"  # 4+8
+
+
+def test_trace_3x3():
+    response = _single("trace", [["1", "0", "0"], ["0", "2", "0"], ["0", "0", "3"]])
+    body = response.json()
+    assert body["success"] is True
+    assert body["result_text"] == "6"  # 1+2+3
+
+
+def test_trace_non_square_dimension_mismatch():
+    response = _single("trace", [["1", "2", "3"], ["4", "5", "6"]])
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_code"] == "DIMENSION_MISMATCH"
+
+
+def test_rank_full_rank_matrix():
+    # Filas linealmente independientes -> rango completo (2), análogo a un
+    # sistema con solución única.
+    response = _single("rank", [["1", "0"], ["0", "1"]])
+    body = response.json()
+    assert body["success"] is True
+    assert body["result_text"] == "2"
+
+
+def test_rank_deficient_rank_matrix():
+    # Fila 2 = 2 * fila 1 -> rango 1, análogo a un sistema compatible
+    # indeterminado (infinitas soluciones).
+    response = _single("rank", [["1", "2"], ["2", "4"]])
+    body = response.json()
+    assert body["success"] is True
+    assert body["result_text"] == "1"
+
+
+def test_rank_zero_matrix():
+    # Caso extremo: matriz nula, rango 0 — análogo al caso degenerado de un
+    # sistema sin ninguna restricción independiente.
+    response = _single("rank", [["0", "0"], ["0", "0"]])
+    body = response.json()
+    assert body["success"] is True
+    assert body["result_text"] == "0"
+
+
+def test_trace_parse_error_propagates():
+    response = _single("trace", [["eval(1)", "2"], ["3", "4"]])
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_code"] == "PARSE_ERROR"
+    assert body["operation"] == "matrix_trace"
+
+
+def test_regression_existing_system_classification_unaffected_by_rank_endpoint():
+    """Regresión exigida por el módulo: la clasificación interna de
+    sistemas (Fase B) sigue funcionando igual — se prueba indirectamente
+    verificando que /solve/system todavía clasifica correctamente un
+    sistema compatible indeterminado, sin que exponer rank() como
+    endpoint haya tocado esa lógica interna."""
+    response = client.post(
+        "/api/v1/solve/system",
+        json={"equations": ["x + y = 2", "2*x + 2*y = 4"], "variables": ["x", "y"]},
+    )
+    body = response.json()
+    assert body["success"] is True

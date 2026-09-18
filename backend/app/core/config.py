@@ -53,6 +53,7 @@ PATH_TO_OPERATION: Dict[str, OperationType] = {
     "/integral/improper": OperationType.INTEGRAL_IMPROPER,
     "/graph/3d": OperationType.GRAPH_3D,
     "/graph/parametric": OperationType.GRAPH_PARAMETRIC,
+    "/graph/polar": OperationType.GRAPH_POLAR,
     "/derivative/partial": OperationType.DERIVATIVE_PARTIAL,
     "/derivative/implicit": OperationType.DERIVATIVE_IMPLICIT,
 }

@@ -465,6 +465,70 @@ def compute_graph_parametric(
     return GraphParametricResult(graph_data, warnings)
 
 
+class GraphPolarResult:
+    def __init__(self, graph_data: GraphData, warnings: List[str]):
+        self.graph_data = graph_data
+        self.warnings = warnings
+
+
+def compute_graph_polar(
+    r_expression: str, variable: str, theta_min: float, theta_max: float
+) -> GraphPolarResult:
+    """Módulo I0 (Fase I, spec_graficacion_matrices_estadistica_unidades.md
+    sección 2): gráfica polar r=f(θ). Reutiliza el mismo pipeline de
+    muestreo numérico que `compute_graph_parametric` — la única diferencia
+    real es la conversión r,θ→x,y antes de armar el trace, tal como pide
+    el spec. Sin tipo de Trace nuevo ni cambio de contrato (spec, sección
+    9: "Fase I: ninguno")."""
+    theta_symbol = _validate_variable(variable)
+    warnings: List[str] = []
+
+    r_expr = parsing.parse_expression_tree(r_expression, allow_equation=False)
+    extra_symbols = r_expr.free_symbols - {theta_symbol}
+    if extra_symbols:
+        raise InvalidVariableError(
+            f"La expresión r(θ) usa variables distintas de '{variable}': "
+            f"{sorted(str(s) for s in extra_symbols)}."
+        )
+
+    n = _PARAMETRIC_SAMPLES
+    step = (theta_max - theta_min) / (n - 1) if n > 1 else 0.0
+    theta_values = [theta_min + i * step for i in range(n)]
+
+    r_values = [_evaluate_at(r_expr, theta_symbol, theta) for theta in theta_values]
+
+    # Igual criterio que compute_graph_parametric: un punto se descarta si
+    # r(θ) no es real en ese θ (discontinuidad, fuera de dominio, etc.), en
+    # vez de cortar solo el eje "independiente" como hace /graph/2d, porque
+    # aquí NO hay eje independiente único (x depende de r y θ juntos).
+    paired = [
+        (r * sympy.cos(theta).evalf(), r * sympy.sin(theta).evalf())
+        for r, theta in zip(r_values, theta_values)
+        if r is not None
+    ]
+    none_ratio = 1 - (len(paired) / n)
+    if none_ratio > 0.2:
+        warnings.append(
+            "Más del 20% de los puntos no son reales (discontinuidades, división "
+            "por cero, o fuera de dominio)."
+        )
+
+    if not paired:
+        x_plot: List[float] = []
+        y_plot: List[Optional[float]] = []
+        x_range = [0.0, 1.0]
+        y_range = None
+    else:
+        x_plot = [float(p[0]) for p in paired]
+        y_plot = [float(p[1]) for p in paired]
+        x_range = [min(x_plot), max(x_plot)]
+        y_range = _compute_y_range(y_plot)
+
+    trace = Trace(type="line", name=f"r={r_expression}", x=x_plot, y=y_plot)
+    graph_data = GraphData(traces=[trace], x_range=x_range, y_range=y_range)
+    return GraphPolarResult(graph_data, warnings)
+
+
 def compute_graph(
     expressions: List[str],
     variable: str,
@@ -541,3 +605,42 @@ def compute_graph(
         analysis=analyses,
     )
     return GraphResult(graph_data, warnings)
+
+
+def graph_complex_point(expression_text: str) -> GraphResult:
+    """Fase F (spec_edo_complejos_tooltips.md §3.4, Módulo F3): botón
+    "Graficar" -- toma un número complejo ya evaluado y lo grafica como
+    punto suelto en el plano de Argand.
+
+    CAMBIO DE CONTRATO, declarado explícito (mismo criterio que exige
+    spec_motor_matematico_pendiente.md sección 6 para su Fase C, y que
+    esta spec pide en su propia sección 3.4): `Trace.type` gana el valor
+    nuevo `"point"` -- decisión del ejecutor entre esto y reutilizar
+    `"line"` con `mode:"markers"` en `traceToPlotly()`. Se eligió un
+    `type` nuevo (en vez de sobrecargar `"line"`) porque `"line"` ya
+    tiene un significado establecido (curva `y=f(x)`) y una entrada de UN
+    solo punto como línea sería semánticamente confusa para cualquier
+    otro consumidor del contrato -- `"point"` es explícito sobre qué es.
+    `traceToPlotly()` sigue siendo responsable de decidir el `mode` de
+    Plotly (`"markers"`) a partir de este `type`, no al revés.
+    """
+    expr = parsing.parse_expression_tree(expression_text, allow_equation=False)
+    if expr.free_symbols:
+        raise ValueError(
+            "La expresión tiene variables libres sin evaluar -- 'Graficar' necesita un "
+            "número complejo concreto, no una expresión simbólica."
+        )
+    re_value = float(sympy.re(expr))
+    im_value = float(sympy.im(expr))
+
+    trace = Trace(type="point", name=expression_text, x=[re_value], y=[im_value])
+    margin = max(abs(re_value), abs(im_value), 1.0) * 1.5
+    graph_data = GraphData(
+        traces=[trace],
+        x_range=[-margin, margin],
+        y_range=[-margin, margin],
+        x_axis_label="Re",
+        y_axis_label="Im",
+    )
+    return GraphResult(graph_data, [])
+

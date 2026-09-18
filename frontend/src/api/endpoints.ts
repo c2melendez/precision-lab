@@ -35,6 +35,9 @@ export const KNOWN_ENDPOINTS = [
   // autogenerada, a diferencia de types/api.ts) y sí puedo/debo tocarla
   // yo mismo.
   "/matrix/norm",
+  // Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md, sección 5).
+  "/matrix/trace",
+  "/matrix/rank",
   "/graph/2d",
   // --- Fase 2 (passthrough trivial real o UNSUPPORTED_IN_PHASE_1) ---
   "/solve/system",
@@ -50,13 +53,31 @@ export const KNOWN_ENDPOINTS = [
   "/integral/improper",
   "/graph/3d",
   "/graph/parametric",
+  // Módulo I0 (spec_graficacion_matrices_estadistica_unidades.md, Fase I).
+  "/graph/polar",
   "/derivative/partial",
   "/derivative/implicit",
   // P6 (spec v2 §7)
   "/statistics/descriptive",
+  // Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md, sección 6.2).
+  "/statistics/correlation",
   "/statistics/combinatorics",
   "/statistics/binomial",
+  // Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7).
+  "/statistics/poisson",
+  "/statistics/uniform",
+  "/statistics/exponential",
   "/statistics/normal",
+  // Fase E (spec_edo_complejos_tooltips.md §2, Módulo E1/E3): whitelist
+  // mantenida a mano (ver cabecera del archivo) -- sin esta línea,
+  // callApi() habría rechazado /ode en runtime pese a que el router
+  // (routers/ode.py) y el wiring de BasicMode.tsx ya estaban completos.
+  // Encontrado con tsc real (TS2345), no solo por inspección.
+  "/ode",
+  // Fase F (Módulo F1): mismo criterio que /ode.
+  "/complex/residue",
+  "/complex/singularities",
+  "/graph/complex_point",
 ] as const;
 
 export type KnownEndpoint = (typeof KNOWN_ENDPOINTS)[number];

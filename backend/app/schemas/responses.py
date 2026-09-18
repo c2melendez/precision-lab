@@ -48,15 +48,41 @@ class OperationType(str, Enum):
     # matriz, necesita su propio valor de operación (igual que
     # transpose/power).
     MATRIX_NORM = "matrix_norm"
+    # Módulo L0 (spec_graficacion_matrices_estadistica_unidades.md, sección
+    # 5): trace es escalar de una sola matriz (mismo patrón que norm);
+    # rank también es escalar de una sola matriz, reutiliza el cálculo ya
+    # interno de Matrix.rank() pero como operación visible propia.
+    MATRIX_TRACE = "matrix_trace"
+    MATRIX_RANK = "matrix_rank"
+    # Módulo M1 (spec_graficacion_matrices_estadistica_unidades.md, sección 6.2).
+    STATISTICS_CORRELATION = "statistics_correlation"
     # P6 (spec v2 §7)
     STATISTICS_DESCRIPTIVE = "statistics_descriptive"
     STATISTICS_COMBINATORICS = "statistics_combinatorics"
     STATISTICS_BINOMIAL = "statistics_binomial"
     STATISTICS_NORMAL = "statistics_normal"
+    # Módulo N0 (spec_graficacion_matrices_estadistica_unidades.md, sección 7).
+    STATISTICS_POISSON = "statistics_poisson"
+    STATISTICS_UNIFORM = "statistics_uniform"
+    STATISTICS_EXPONENTIAL = "statistics_exponential"
     # Pendiente #5 (revisión post-Módulo D del track de motor matemático,
     # pedido por el usuario): sistema de inecuaciones lineales,
     # equivalente Full/SymPy del ya construido en Lite.
     INEQUALITY_SYSTEM = "inequality_system"
+    # Módulo I0 (Fase I, spec_graficacion_matrices_estadistica_unidades.md):
+    # gráfica polar r=f(θ) — reutiliza ResultType.GRAPH y GraphData, mismo
+    # patrón que GRAPH_PARAMETRIC (convierte a x,y antes de graficar, sin
+    # tipo de Trace nuevo).
+    GRAPH_POLAR = "graph_polar"
+    # Fase E (spec_edo_complejos_tooltips.md §2, §6): ecuaciones
+    # diferenciales ordinarias — nuevo endpoint dedicado /ode, extensión
+    # aditiva y retrocompatible (regla de proyecto, cabecera de este
+    # archivo).
+    ODE = "ode"
+    # Fase F (spec_edo_complejos_tooltips.md §3.2, Módulo F1): variable
+    # compleja -- residuos y singularidades. Aditivo, mismo criterio que ODE.
+    COMPLEX_RESIDUE = "complex_residue"
+    COMPLEX_SINGULARITIES = "complex_singularities"
 
 
 class MatrixOpKind(str, Enum):
@@ -89,6 +115,14 @@ class ResultType(str, Enum):
     # ya existente en MathResponse.result_data en vez de ampliar el
     # Union, cada vértice es ["x", "y"] como strings).
     INEQUALITY_REGION = "inequality_region"
+    # Fase E: solución de una EDO, "y(x) = ..." — se le da un ResultType
+    # propio (en vez de reusar SCALAR/EQUATION_SOLUTIONS) porque
+    # semánticamente no es ninguno de los dos: no es un escalar y no es
+    # una lista de raíces, es una función. Cambio aditivo.
+    ODE_SOLUTION = "ode_solution"
+    # Fase F: residuo (escalar/complejo) y lista de singularidades.
+    COMPLEX_RESIDUE = "complex_residue"
+    COMPLEX_SINGULARITIES = "complex_singularities"
 
 
 class ErrorCode(str, Enum):
@@ -105,6 +139,7 @@ class ErrorCode(str, Enum):
       AMBIGUOUS_VARIABLE     200  solve con >1 símbolo libre sin variable especificada
       INVALID_VARIABLE       200  variable de gráfica no coincide con la expresión
       UNSUPPORTED_IN_PHASE_1 200  feature de Fase 2 sin passthrough trivial
+      UNSUPPORTED_OPERATION  200  operación bien formada pero fuera del alcance real del motor (spec_edo_complejos_tooltips.md §2, distinto de UNSUPPORTED_IN_PHASE_1: esto no es "todavía no implementado", es "este caso específico el motor no lo resuelve")
       INTERNAL_ERROR         500  excepción no esperada / error de red en el cliente
     """
 
@@ -118,6 +153,11 @@ class ErrorCode(str, Enum):
     AMBIGUOUS_VARIABLE = "AMBIGUOUS_VARIABLE"
     INVALID_VARIABLE = "INVALID_VARIABLE"
     UNSUPPORTED_IN_PHASE_1 = "UNSUPPORTED_IN_PHASE_1"
+    # Fase E (spec_edo_complejos_tooltips.md §2.1: "cualquier EDO fuera de
+    # los tipos cubiertos... devuelve UNSUPPORTED_OPERATION con mensaje
+    # claro"). No existía en este enum -- Lite (types.ts) ya lo tenía.
+    # Adición aditiva y retrocompatible (regla de proyecto, cabecera).
+    UNSUPPORTED_OPERATION = "UNSUPPORTED_OPERATION"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -136,6 +176,7 @@ ERROR_CODE_HTTP_STATUS: Dict[ErrorCode, int] = {
     ErrorCode.AMBIGUOUS_VARIABLE: 200,
     ErrorCode.INVALID_VARIABLE: 200,
     ErrorCode.UNSUPPORTED_IN_PHASE_1: 200,
+    ErrorCode.UNSUPPORTED_OPERATION: 200,
     ErrorCode.INTERNAL_ERROR: 500,
 }
 
@@ -188,6 +229,12 @@ class GraphData(BaseModel):
     y_range: Optional[List[float]] = None
     points_truncated: bool = False
     analysis: Optional[List[GraphAnalysis]] = None
+    # Fase F (spec_edo_complejos_tooltips.md §3.4, Módulo F3): "Re"/"Im"
+    # en modo Argand en vez de "x"/"y". Aditivo — None (el default) deja
+    # el comportamiento existente exactamente igual (GraphViewer.tsx
+    # debe tratar None como "x"/"y", nunca como ausencia de etiqueta).
+    x_axis_label: Optional[str] = None
+    y_axis_label: Optional[str] = None
 
 
 class MathResponse(BaseModel):

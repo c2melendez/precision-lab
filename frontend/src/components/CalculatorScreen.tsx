@@ -46,6 +46,7 @@ import { FloatingWindow } from "./FloatingWindow";
 import { GraphPlaceholder } from "./GraphPlaceholder";
 import { MathRenderer } from "./MathRenderer";
 import { NaturalMathField } from "./NaturalMathField";
+import { RecentKeysBar } from "./RecentKeysBar";
 import { ResultPanel } from "./ResultPanel";
 import { useMinWidthMediaQuery, FLOATING_MIN_WIDTH_PX } from "../hooks/useMinWidthMediaQuery";
 
@@ -261,23 +262,30 @@ function StackedKeyboardSection() {
   const canExpand = content !== null || basicContent !== null;
 
   return (
-    <div className="rounded-xl border border-paper-line bg-paper-soft">
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={!canExpand}
-        aria-expanded={isOpen}
-        className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-ink disabled:text-muted/40"
-      >
-        <span>Teclado</span>
-        <span aria-hidden="true">{isOpen ? "▾" : "▴"}</span>
-      </button>
-      {isOpen && canExpand && (
-        <div className="border-t border-paper-line px-3 pb-3 pt-2">
-          {basicContent}
-          {content}
-        </div>
-      )}
+    <div className="flex flex-col gap-1.5">
+      {/* Fase X, Módulo X0 — "justo arriba de donde aparecerá el
+          teclado (colapsado o no)": en Apilado, la sección entera
+          (colapsada o expandida) vive dentro de esta caja, así que el
+          dock de recientes va fuera y encima de ella. */}
+      <RecentKeysBar />
+      <div className="rounded-xl border border-paper-line bg-paper-soft">
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={!canExpand}
+          aria-expanded={isOpen}
+          className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-ink disabled:text-muted/40"
+        >
+          <span>Teclado</span>
+          <span aria-hidden="true">{isOpen ? "▾" : "▴"}</span>
+        </button>
+        {isOpen && canExpand && (
+          <div className="border-t border-paper-line px-3 pb-3 pt-2">
+            {basicContent}
+            {content}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -342,6 +350,14 @@ function FloatingScreenContent({ angleBadge, inputField, resultBlock }: FocusLik
       </div>
       <div className="rounded-xl bg-paper-soft px-4 py-3 shadow-sm">{inputField}</div>
       {resultBlock && <div className="rounded-xl bg-paper-soft px-4 py-3 shadow-sm">{resultBlock}</div>}
+      {/* Fase X, Módulo X0 — "justo arriba de donde aparecerá el
+          teclado": aquí el teclado vive en su propia FloatingWindow, así
+          que el dock de recientes va fuera de ella, inmediatamente
+          encima. No entra DENTRO de FloatingWindow porque esa ventana es
+          arrastrable/redimensionable de forma independiente (persistida
+          en useFloatingLayoutStore) — el dock de recientes no forma
+          parte de esa superficie, es un elemento fijo del layout. */}
+      <RecentKeysBar />
       <FloatingWindow title="Teclado" rect={keyboardWindow} onChange={(rect) => setWindow("keyboard", rect)}>
         {basicContent}
         {content}

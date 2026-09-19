@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { ReactNode } from "react";
 
+import type { KeyDef } from "../components/NaturalMathKeyboard";
+
 /**
  * useKeyboardPanelStore.ts — Módulo 0.
  *
@@ -66,6 +68,17 @@ interface KeyboardPanelState {
   clearBasicContent: () => void;
   setCompactActions: (actions: { onEnter: () => void; onBackspace: () => void }) => void;
   clearCompactActions: () => void;
+  /** Fase X, Módulo X0 (Smart Docks): función de inserción del modo
+   * activo, registrada por NaturalMathKeyboard.tsx (misma vía que
+   * `content`) para que RecentKeysBar.tsx pueda reinsertar una tecla
+   * reciente sin conocer el `mathField`/handlers del modo activo — solo
+   * conoce el `KeyDef`, igual que cualquier otro botón del teclado.
+   * PATRÓN OBLIGATORIO: mismo criterio de dos-efectos-separados que
+   * `content`/`compactActions` (ver comentario de cabecera) — evitar el
+   * mismo bug ya documentado de cierre-al-escribir. */
+  insertHandler: ((k: KeyDef) => void) | null;
+  setInsertHandler: (fn: (k: KeyDef) => void) => void;
+  clearInsertHandler: () => void;
 }
 
 export const useKeyboardPanelStore = create<KeyboardPanelState>((set) => ({
@@ -82,4 +95,7 @@ export const useKeyboardPanelStore = create<KeyboardPanelState>((set) => ({
   clearBasicContent: () => set({ basicContent: null }),
   setCompactActions: (compactActions) => set({ compactActions }),
   clearCompactActions: () => set({ compactActions: null }),
+  insertHandler: null,
+  setInsertHandler: (insertHandler) => set({ insertHandler }),
+  clearInsertHandler: () => set({ insertHandler: null }),
 }));

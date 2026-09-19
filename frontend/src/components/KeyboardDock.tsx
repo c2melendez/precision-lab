@@ -2,6 +2,7 @@ import { useKeyboardPanelStore } from "../store/useKeyboardPanelStore";
 import { useLayoutModeStore } from "../store/useLayoutModeStore";
 import { useMinWidthMediaQuery, FLOATING_MIN_WIDTH_PX } from "../hooks/useMinWidthMediaQuery";
 import { KeyboardPanel } from "./KeyboardPanel";
+import { RecentKeysBar } from "./RecentKeysBar";
 
 /**
  * KeyboardDock.tsx — Módulo 0 + Módulo 1 + corrección post-Módulo 7 (idéntico a Lite, paridad obligatoria).
@@ -112,6 +113,11 @@ export function KeyboardDock() {
       )}
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-chrome-soft bg-chrome px-3 pb-[env(safe-area-inset-bottom)] pt-2">
+        {/* Fase X, Módulo X0 (Smart Docks) — "justo arriba de donde
+            aparecerá el teclado (colapsado o no)", confirmado por Carlos.
+            Primera fila del mismo contenedor fijo: queda por encima del
+            grid básico Y de la fila compacta en cualquier estado. */}
+        <RecentKeysBar />
         {basicContent ? (
           <div className={forceCompactDock ? "hidden" : "mx-auto hidden max-w-md md:block"}>{basicContent}</div>
         ) : (

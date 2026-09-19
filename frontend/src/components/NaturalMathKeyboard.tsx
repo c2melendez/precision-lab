@@ -59,9 +59,12 @@
  */
 
 import type { MathfieldElement } from "mathlive";
-import { useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { KeyGlyph, type Glyph, BOX } from "./KeyGlyph";
 import { triggerKeyFeedback } from "../utils/keyFeedback";
+import { useUIStore } from "../store/useUIStore";
+import { useKeyboardPanelStore } from "../store/useKeyboardPanelStore";
+import { useRecentKeysStore } from "../store/useRecentKeysStore";
 
 /** Acción de long-press (Módulo 0) — mismo campo que en Lite (paridad),
  * ver comentario completo en MathKeyboard.tsx de precision-lab-lite. Sin
@@ -211,6 +214,26 @@ const SYMBOLS_ROW_2: KeyDef[] = [
   ),
   key("⌫", "", "borrar", false, undefined, "borra el último carácter escrito"),
 ];
+
+/**
+ * Fase X, Módulo X0 (spec_rediseno_visual.md sección 10 — Smart Docks):
+ * clasificación DEDUCIBLE de "variable/constante" vs. "operación", para
+ * separar las teclas en los dos historiales recientes. Se deriva de
+ * `SYMBOLS_ROW_2` (única fila que ya agrupa exactamente ese conjunto —
+ * i/π/e/∞/x/y/z/θ) en vez de mantener una lista aparte que pudiera
+ * desincronizarse. Se identifica por `insertLatex` exacto (no por
+ * glyph) porque es el campo estable entre invocaciones de `key()`.
+ * Prima (') y ⌫ se excluyen a propósito: la prima es notación de
+ * derivada, no una variable/constante, y ⌫ nunca llega a `press()`
+ * (interceptada antes, en `pressSymbol`).
+ */
+const VARIABLE_CONSTANT_LATEX = new Set(
+  SYMBOLS_ROW_2.filter((k) => k.insertLatex !== "'" && k.insertLatex !== "").map((k) => k.insertLatex),
+);
+
+export function isVariableOrConstantKey(k: KeyDef): boolean {
+  return VARIABLE_CONSTANT_LATEX.has(k.insertLatex);
+}
 
 const RELATIONAL_ROW: KeyDef[] = [
   key("<", "<", "menor que"),
@@ -694,6 +717,11 @@ export function NaturalMathKeyboard({
   // Pendiente #2: menú chico "¿cuántas ecuaciones?" al tocar "Sistema".
   const [showSystemSizeMenu, setShowSystemSizeMenu] = useState(false);
 
+  // Fase X, Módulo X0 (Smart Docks) — alcance confirmado por Carlos:
+  // separado por modo (Científica/Matrices/Estadística/etc.).
+  const activeMode = useUIStore((s) => s.activeMode);
+  const recordKey = useRecentKeysStore((s) => s.recordKey);
+
   function press(k: KeyDef): void {
     if (k.unavailable) {
       setNotice(`${k.ariaLabel}: todavía no disponible.`);
@@ -705,9 +733,34 @@ export function NaturalMathKeyboard({
     // ANTES de la inserción genérica.
     if (k.glyph === "Graficar" && k.insertLatex === "") return onGraphComplex?.();
     field?.focus();
-    if (k.insertLatex) field?.insert(k.insertLatex);
+    if (k.insertLatex) {
+      field?.insert(k.insertLatex);
+      // Fase X, Módulo X0: solo se registran teclas que insertan
+      // contenido real (excluye "=", "f(x)=0", DEL/⌫, "Graficar" —
+      // todas con insertLatex vacío o interceptadas antes de llegar
+      // aquí) — no tiene sentido "reusar" una acción de UI desde el
+      // dock de recientes.
+      recordKey(activeMode, k, isVariableOrConstantKey(k) ? "variable" : "operation");
+    }
     setOpenCategory(null);
   }
+
+  // Fase X, Módulo X0: registra `press` como el manejador de inserción
+  // del modo activo, para que RecentKeysBar.tsx (montado aparte, sin
+  // acceso a `field`/handlers de este modo) pueda reinsertar una tecla
+  // reciente. PATRÓN OBLIGATORIO (ver cabecera de useKeyboardPanelStore.ts):
+  // efecto separado del de limpieza, para no cerrar nada mientras se
+  // escribe (mismo bug ya documentado con `content`/`compactActions`).
+  const setInsertHandler = useKeyboardPanelStore((s) => s.setInsertHandler);
+  useEffect(() => {
+    setInsertHandler(press);
+  });
+  const clearInsertHandler = useKeyboardPanelStore((s) => s.clearInsertHandler);
+  useEffect(() => {
+    return () => clearInsertHandler();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   function pressBase(k: KeyDef): void {
     if (k.glyph === "=" && k.insertLatex === "") return onSubmit?.();

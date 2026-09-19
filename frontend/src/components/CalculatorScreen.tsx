@@ -44,6 +44,7 @@ import { useKeyboardPanelStore } from "../store/useKeyboardPanelStore";
 import type { LayoutMode } from "../store/useLayoutModeStore";
 import { FloatingWindow } from "./FloatingWindow";
 import { GraphPlaceholder } from "./GraphPlaceholder";
+import { KeyboardIcon } from "./KeyboardIcon";
 import { MathRenderer } from "./MathRenderer";
 import { NaturalMathField } from "./NaturalMathField";
 import { RecentKeysBar } from "./RecentKeysBar";
@@ -276,7 +277,10 @@ function StackedKeyboardSection() {
           aria-expanded={isOpen}
           className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-ink disabled:text-muted/40"
         >
-          <span>Teclado</span>
+          <span className="flex items-center gap-2">
+            <KeyboardIcon className="h-4 w-4 text-marker" />
+            Teclado
+          </span>
           <span aria-hidden="true">{isOpen ? "▾" : "▴"}</span>
         </button>
         {isOpen && canExpand && (
@@ -325,6 +329,9 @@ function FloatingScreenContent({ angleBadge, inputField, resultBlock }: FocusLik
 
   const basicContent = useKeyboardPanelStore((s) => s.basicContent);
   const content = useKeyboardPanelStore((s) => s.content);
+  const isOpen = useKeyboardPanelStore((s) => s.isOpen);
+  const toggle = useKeyboardPanelStore((s) => s.toggle);
+  const canExpand = basicContent !== null || content !== null;
 
   useEffect(() => {
     if (!isWideEnough) return;
@@ -358,10 +365,38 @@ function FloatingScreenContent({ angleBadge, inputField, resultBlock }: FocusLik
           en useFloatingLayoutStore) — el dock de recientes no forma
           parte de esa superficie, es un elemento fijo del layout. */}
       <RecentKeysBar />
-      <FloatingWindow title="Teclado" rect={keyboardWindow} onChange={(rect) => setWindow("keyboard", rect)}>
-        {basicContent}
-        {content}
-      </FloatingWindow>
+      {/* Fase Y (spec_rediseno_visual.md sección 11) — restricción dura:
+          el teclado SIEMPRE inicia colapsado, en las 6 disposiciones sin
+          excepción, Flotante incluida. Antes de este fix, la
+          FloatingWindow de abajo se renderizaba sin condición alguna —
+          es decir, el teclado quedaba SIEMPRE abierto en Flotante-ancho,
+          violando la restricción. Ahora: colapsado por defecto (botón
+          dedicado, mismo ícono/criterio que KeyboardDock.tsx), se abre
+          por foco en el campo de entrada (NaturalMathField.tsx) o al
+          presionar este botón — mismos 2 mecanismos que las otras 5
+          disposiciones, sobre el mismo store `isOpen`. */}
+      {isOpen && canExpand ? (
+        <FloatingWindow title="Teclado" rect={keyboardWindow} onChange={(rect) => setWindow("keyboard", rect)}>
+          {basicContent}
+          {content}
+        </FloatingWindow>
+      ) : (
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={!canExpand}
+          aria-expanded={isOpen}
+          aria-label="Abrir teclado"
+          className={
+            canExpand
+              ? "flex items-center justify-center gap-2 self-start rounded-lg bg-marker px-4 py-2 text-sm font-semibold text-chrome hover:bg-marker/90"
+              : "flex items-center justify-center gap-2 self-start rounded-lg bg-chrome-soft px-4 py-2 text-sm text-bone/30"
+          }
+        >
+          <KeyboardIcon className="h-4 w-4" />
+          Teclado
+        </button>
+      )}
       <FloatingWindow title="Gráfica" rect={graphWindow} onChange={(rect) => setWindow("graph", rect)}>
         <GraphPlaceholder />
       </FloatingWindow>

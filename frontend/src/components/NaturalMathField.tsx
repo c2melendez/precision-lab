@@ -19,6 +19,7 @@ import "mathlive";
 import { convertLatexToAsciiMath } from "mathlive/ssr";
 import { useCallback, useEffect, useId, useRef } from "react";
 import type { MathfieldElement, MathfieldElementAttributes } from "mathlive";
+import { useKeyboardPanelStore } from "../store/useKeyboardPanelStore";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -213,6 +214,27 @@ export function NaturalMathField({
     return () => el.removeEventListener("input", handleInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onLatexChange]);
+
+  // Fase Y (spec_rediseno_visual.md sección 11) — restricción dura: el
+  // teclado SIEMPRE inicia colapsado, y uno de los 2 mecanismos
+  // obligatorios de apertura es "foco en el campo de entrada". Este
+  // componente es el campo de entrada compartido por TODOS los modos
+  // (Científica, Derivada, Integral, Ecuación, Sistema, Límite,
+  // Gráficas, Unidades) — un solo listener aquí cubre los 4 breakpoints
+  // × 6 disposiciones sin tocar cada modo por separado. `getState().open()`
+  // en vez de un hook suscrito: esto es un evento imperativo, no algo
+  // que deba re-renderizar este componente cuando `isOpen` cambie.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+
+    function handleFocus(): void {
+      useKeyboardPanelStore.getState().open();
+    }
+
+    el.addEventListener("focus", handleFocus);
+    return () => el.removeEventListener("focus", handleFocus);
+  }, []);
 
   useEffect(() => {
     const el = elRef.current;

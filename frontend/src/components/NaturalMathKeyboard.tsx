@@ -792,13 +792,13 @@ export function NaturalMathKeyboard({
   return (
     <div className="relative rounded-xl bg-chrome p-3" onClickCapture={handleKeyboardClickCapture}>
       {notice && (
-        <div className="absolute bottom-full left-3 right-3 mb-1.5 rounded-lg bg-chrome-soft px-3 py-2 text-center text-xs text-bone shadow-lg">
+        <div className="mb-1.5 rounded-lg bg-chrome-soft px-3 py-2 text-center text-xs text-bone shadow-lg">
           {notice}
         </div>
       )}
 
       {openCategory && (
-        <div className="absolute bottom-full left-3 right-3 mb-1.5 rounded-lg bg-chrome-soft p-3 shadow-lg">
+        <div className="mb-1.5 rounded-lg bg-chrome-soft p-3 shadow-lg">
           {openCategory === "Símbolos" ? (
             <div className="flex flex-col gap-1">
               <div className="grid grid-cols-9 gap-1">
